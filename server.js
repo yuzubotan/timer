@@ -8,6 +8,13 @@ app.get('/', (req,res) => {
     res.render('index.ejs', opt);
 })
 
+app.get('/timeline', (req, res) => {
+    let opt = {
+        title: "timeline"
+    }
+    res.render('timeline.ejs', opt);
+})
+
 app.listen(port, () => {
     console.log(`Server is running on ${port} `);
 })

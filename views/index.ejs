@@ -7,12 +7,13 @@
     <style>
         body {
             background-color: #bcffff;
+            max-width: 900px;
         }
 
         header {
             width: 96%;
         }
-        
+
         .header {
             font-weight: bold;
             background-color: white;
@@ -105,7 +106,7 @@
 <body>
     <header>
         <span id="order" class="header">注文履歴</span>
-        <span id="switch" class="header">switch</span>
+        <span id="switch" class="header" onclick="location.href='/timeline'">switch</span>
     </header>
     <div id="wait_time">0:00:00</div>
     <div class="grid-container">

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <style>
+      html {
+        max-width: 900px;
+      }
+      body {
+        background-color: #bcffff;
+        font-family: Arial, sans-serif;
+        overflow: hidden; /* スクロールバーを隠す */
+      }
+  
+      .timeline-container {
+        position: relative;
+        width: 200px; /* タイムラインの幅 */
+        height: 100vh; /* タイムラインを全画面表示 */
+        margin: 0 auto;
+        display: flex;
+        justify-content: left;
+        align-items: center;
+        background-color: #f0f0f0;
+      }
+  
+      .timeline {
+        position: relative;
+        width: 2px; /* 直線の幅 */
+        height: 100%;
+        background-color: #333; /* 直線の色 */
+      }
+  
+      .time-marker {
+        position: absolute;
+        left: -40px; /* 直線からの距離 */
+        font-size: 14px;
+        color: #333;
+        transform: translateY(-50%);
+      }
+        
+      header {
+        width: 96%;
+      }
+        
+      .header {
+          font-weight: bold;
+          background-color: white;
+          border-radius: 10px;
+          width: 93px;
+          height: 46px;
+          line-height: 46px;
+          display: inline-block;
+          font-size: 16px;
+          text-align: center;
+      }
+
+      #switch {
+          float:right;
+      }
+
+    
+
+        
+    </style>
+</head>
+<body>
+    <header>
+        <span id="order" class="header">注文履歴</span>
+        <span id="switch" class="header" onclick="location.href='/'">switch</span>
+    </header>
+    
+    <div class="timeline-container">
+        <div class="timeline">
+          <!-- JavaScriptで生成される時間表示用の要素 -->
+        </div>
+      </div>
+    <script>
+            // タイムラインコンテナ
+const timeline = document.querySelector('.timeline');
+
+// 初期時間と表示のステップ（5分刻み）
+let startTime = new Date(new Date().getTime() - 5 * 60 * 1000);
+
+const stepMinutes = 5; // 5分刻み
+const duration = 60 * 11 ; // 営業時間(１１時間分)のタイムライン
+const totalSteps = duration / (stepMinutes / 60);
+
+// タイムラインに時間マーカーを追加する
+for (let i = 0; i <= totalSteps; i++) {
+  const marker = document.createElement('div');
+  marker.classList.add('time-marker');
+
+  // 時間のフォーマット（hh:mm形式）
+  const time = new Date(startTime.getTime() + i * stepMinutes * 60 * 1000);
+  const formattedTime = time.getHours().toString().padStart(2, '0') + ':' + time.getMinutes().toString().padStart(2, '0');
+
+  marker.textContent = formattedTime;
+  marker.style.top = `${i * 200}px`; // 各マーカーの位置を調整（200pxごとに表示）
+  
+  timeline.appendChild(marker);
+}
+
+// 縦スクロールを時間経過とリンク
+let scrollPosition = 0;
+const scrollSpeed = 0.025; // スクロールの速さ（px単位）
+
+function scrollTimeline() {
+  scrollPosition += scrollSpeed;
+  timeline.style.transform = `translateY(-${scrollPosition}px)`;
+  requestAnimationFrame(scrollTimeline);
+}
+
+// スクロールを開始
+scrollTimeline();
+
+    </script>
+</body>
+</html>
