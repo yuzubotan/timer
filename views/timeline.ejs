@@ -16,20 +16,26 @@
   
       .timeline-container {
         position: relative;
-        width: 200px; /* タイムラインの幅 */
-        height: 100vh; /* タイムラインを全画面表示 */
+        width: 400px; /* タイムラインの幅 */
+        height: 3000px;
         margin: 0 auto;
+        border: 1px solid;
         display: flex;
         justify-content: left;
         align-items: center;
         background-color: #f0f0f0;
+        overflow: scroll;
+        
       }
   
       .timeline {
-        position: relative;
+        position: absolute;
+        top: 100px;
+        left: 50px;
         width: 2px; /* 直線の幅 */
-        height: 100%;
         background-color: #333; /* 直線の色 */
+        height: 30000px; /* タイムラインの高さを設定 */
+        
       }
   
       .time-marker {
@@ -42,6 +48,9 @@
         
       header {
         width: 96%;
+        height: 60px;
+        position: sticky;
+        z-index: 10;
       }
         
       .header {
@@ -84,7 +93,7 @@ const timeline = document.querySelector('.timeline');
 let startTime = new Date(new Date().getTime() - 5 * 60 * 1000);
 
 const stepMinutes = 5; // 5分刻み
-const duration = 60 * 11 ; // 営業時間(１１時間分)のタイムライン
+const duration =  13 ; // 営業時間(１１時間分)のタイムライン
 const totalSteps = duration / (stepMinutes / 60);
 
 // タイムラインに時間マーカーを追加する
@@ -109,6 +118,7 @@ const scrollSpeed = 0.025; // スクロールの速さ（px単位）
 function scrollTimeline() {
   scrollPosition += scrollSpeed;
   timeline.style.transform = `translateY(-${scrollPosition}px)`;
+  
   requestAnimationFrame(scrollTimeline);
 }
 
