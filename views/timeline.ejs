@@ -3,8 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %></title>
+    <title></title>
     <style>
+      button, span {
+        margin: 0;
+        padding: 0;
+      }
+
       html {
         max-width: 900px;
       }
@@ -22,7 +27,6 @@
         border: 1px solid;
         display: flex;
         justify-content: left;
-        align-items: center;
         background-color: #f0f0f0;
         overflow: scroll;
         
@@ -30,7 +34,7 @@
   
       .timeline {
         position: absolute;
-        top: 100px;
+        top: 50px;
         left: 50px;
         width: 2px; /* 直線の幅 */
         background-color: #333; /* 直線の色 */
@@ -69,25 +73,101 @@
           float:right;
       }
 
+      .data-item {
+      position: absolute;
+      display: flex;
+      justify-content: center;
+      width: 300px;
+      left: 55px;
+      font-size: 15px;
+      color: #333;
+      transform: translateY(-50%);
     
+    }
+
+      .point {
+        color: red;
+        position: absolute;
+        left: -15px;
+        top: 5px;
+        font-size: 30px
+
+      }
+    
+      .id {
+        border: 1px solid;
+        background-color: white;
+        display: inline-block;
+        width: 40px;
+        height: 50px;
+        font-size: 30px;
+        font-weight: bold;
+        line-height: 50px;
+        text-align: center;
+        margin-right: 5px;
+      }
+
+      .bt {
+        border: 1px solid;
+        background-color: white;
+        width: 50px;
+        height: 50px;
+        display: inline-block;
+        margin-right: 5px;
+      }
+
+      .order {
+        border: 1px solid;
+        background-color: white;
+        height: 50px;
+        line-height: 50px;
+        display: inline-block;
+        margin-right: 5px;
+      }
 
         
     </style>
 </head>
 <body>
     <header>
-        <span id="order" class="header">注文履歴</span>
+        <span id="order" class="header" onclick="location.href='/order'">注文履歴</span>
         <span id="switch" class="header" onclick="location.href='/'">switch</span>
     </header>
     
     <div class="timeline-container">
         <div class="timeline">
-          <!-- JavaScriptで生成される時間表示用の要素 -->
+          
+      
+          
         </div>
-      </div>
+        <div class="timeline2">
+          <% for (const item of data) { %>
+             
+               <% const currentTime = new Date();
+                             let itemTop = 250 + ((Math.floor(item.hour * 12) + Math.floor(item.minutes / 5)) * 200 + (item.minutes % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
+                          %>
+              
+                          <% if(itemTop >= 0) { %>
+                             <div class="data-item" style="top: <%= itemTop %>px">
+                                <span class="point">●</span><span class="id"><%= item.id %></span>
+                                <button class="bt" onclick="javascript:del(<%= item.id %>, <%= item.number %>)">DEL</button>
+                                <span class="order">時刻:<%= item.datetime %> 本数:<%= item.number %></span>
+                                <button class="bt">OK</button>
+                              </div>
+                          <% } %>
+
+             
+            
+          <% } %>
+        </div>
+    </div>
     <script>
             // タイムラインコンテナ
 const timeline = document.querySelector('.timeline');
+const timeline2 = document.querySelector('.timeline2');
+const currentTime = new Date();
+
+
 
 // 初期時間と表示のステップ（5分刻み）
 let startTime = new Date(new Date().getTime() - 5 * 60 * 1000);
@@ -111,6 +191,7 @@ for (let i = 0; i <= totalSteps; i++) {
   timeline.appendChild(marker);
 }
 
+
 // 縦スクロールを時間経過とリンク
 let scrollPosition = 0;
 const scrollSpeed = 0.025; // スクロールの速さ（px単位）
@@ -118,12 +199,26 @@ const scrollSpeed = 0.025; // スクロールの速さ（px単位）
 function scrollTimeline() {
   scrollPosition += scrollSpeed;
   timeline.style.transform = `translateY(-${scrollPosition}px)`;
+  timeline2.style.transform = `translateY(-${scrollPosition}px)`;
   
   requestAnimationFrame(scrollTimeline);
 }
 
 // スクロールを開始
 scrollTimeline();
+
+let timeToAdjust = 0;
+
+function del(id, number) {
+          timeToAdjust = number / 10 * 60;
+          console.log(timeToAdjust);
+          let result = window.confirm('id=' + id + 'を削除しますか？');
+          if (result) {
+            window.location = "/timeline/del?id=" + id;
+          }
+        }
+
+console.log(timeToAdjust)
 
     </script>
 </body>

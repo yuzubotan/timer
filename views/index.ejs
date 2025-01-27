@@ -8,6 +8,7 @@
         body {
             background-color: #bcffff;
             max-width: 900px;
+            
         }
 
         header {
@@ -37,8 +38,8 @@
 
         .grid-container {
             display: grid;
-            grid-template-rows: 1fr 1fr;
-            grid-template-columns: 153px auto;
+            grid-template-rows: 1fr 1fr ;
+            grid-template-columns: 1fr 1fr;
             height: 159px;
             gap: 30px;
             margin-bottom: 30px;
@@ -53,7 +54,7 @@
 
         .grid-item:nth-child(1) {
             
-            grid-row: 1 / 3;
+            grid-row: 1 / 2;
         }
 
        input {
@@ -63,7 +64,7 @@
 
 
        .grid-1 {
-        
+        width: 180px;
         text-align: center;
         display: inline-block;
         line-height: 159px;
@@ -72,6 +73,21 @@
 
        .grid-2 {
         margin-bottom: 10px;
+       }
+
+       .grid-3 {
+        margin-bottom:3px;
+        display: inline-block;
+        width: 100px;
+       }
+
+       .grid-5 {
+        display: none;
+        
+       }
+
+       .time {
+        display: inline-block;
        }
       
        .grid-container-2 {
@@ -86,7 +102,7 @@
        .grid-bt {
         background-color: white;
         width: 93px;
-        height: 97px;
+        height: 90px;
         text-align: center;
         line-height: 97px;
         font-size: 64px;
@@ -101,37 +117,252 @@
        .wait_time {
         padding: 0;
        }
+
+       #switch_bt {
+        width: 60px;
+        height: 25px;
+        margin: 0;
+       }
+
+       .time {
+        height:40px;
+        width: 100px;
+        font-size: 20px;
+        display: inline-block;
+        background-color: white;
+        margin-right: 10px;
+       }
+       
+       .addTime {
+        margin-bottom: 15px;
+       }
+
+       #reset-bt {
+        border: 2px solid black;
+        display: inline-block;
+        line-height: 40px;
+        text-align: center;
+       }
     </style>
 </head>
 <body>
     <header>
-        <span id="order" class="header">注文履歴</span>
+        <span id="order" class="header" onclick="location.href='/order'">注文履歴</span>
         <span id="switch" class="header" onclick="location.href='/timeline'">switch</span>
     </header>
     <div id="wait_time">0:00:00</div>
+    <button id="switch_bt">ON/OFF</button>
     <div class="grid-container">
-        <div class="grid-item grid-1">1</div>
-        <form action="">
-            <label for="" class="label-1">時刻</label><br>
-            <input type="datetime-local" class="grid-item grid-2"><br>
-            <label for="" class="label-2">本数</label><br>
-            <input type="text" class="grid-item grid-3">
-        </form>
-    </div>
+        <div class="grid-item grid-1" id="id"></div>
+            <form action="/submit" method="POST" id="form">
+                <label for="time" class="label-1">時刻</label><br>
+                <input type="datetime-local" id="time" name="time"  class="grid-item grid-2"><br>
+                <label for="number" class="label-2">本数</label><br>
+                <input type="text" id="number" name="number" class="grid-item grid-3">
+                <input type="submit" id="submit_bt" class="grid-item grid-4">
+                
+            </form>
+            
+            <div class="grid-5" id="grid-5">
+                <div class="addTime">
+                    <button class="time" id="1minute--">- 1:00</button>
+                    <button class="time" id="1minute++">+ 1:00</button>
+                </div>
+                <div class="addTime">
+                    <button class="time" id="5minute--">- 5:00</button>
+                    <button class="time" id="5minute++">+ 5:00</button>
+                </div>
+                <a href="javascript:reset()" class="time" id="reset-bt" >reset</a>
+            </div>
+            
+        </div>
+        
     <div class="grid-container-2">
-        <div class="grid-bt">1</div>
-        <div class="grid-bt">2</div>
-        <div class="grid-bt">3</div>
-        <div class="grid-bt">4</div>
-        <div class="grid-bt">5</div>
-        <div class="grid-bt">6</div>
-        <div class="grid-bt">7</div>
-        <div class="grid-bt">8</div>
-        <div class="grid-bt">9</div>
-        <div class="grid-bt text-bt">del</div>
-        <div class="grid-bt">0</div>
-        <div class="grid-bt text-bt">送信</div>
+        <div class="grid-bt" onclick="addNumber(10)">1</div>
+        <div class="grid-bt" onclick="addNumber(20)">2</div>
+        <div class="grid-bt" onclick="addNumber(30)">3</div>
+        <div class="grid-bt" onclick="addNumber(40)">4</div>
+        <div class="grid-bt" onclick="addNumber(50)">5</div>
+        <div class="grid-bt" onclick="addNumber(60)">6</div>
+        <div class="grid-bt" onclick="addNumber(70)">7</div>
+        <div class="grid-bt" onclick="addNumber(80)">8</div>
+        <div class="grid-bt" onclick="addNumber(90)">9</div>
+        <div class="grid-bt text-bt" onclick="deleteLast();">del</div>
+        <div class="grid-bt" onclick="addNumber(0)">0</div>
+        <div class="grid-bt text-bt">+</div>
     </div>
+<script>
+    const number = document.getElementById('number');
+
+  
+
+    function addNumber(num) {
+        number.value += num;
+    }
+
+    function deleteLast() {
+        number.value = number.value.slice(0, -1);
+    }
+
+    let timerValue = 0;
+    let now = new Date();
+    let tv = parseInt(timerValue, 10);
+    let wait_minutes = new Date(now.getTime() + tv * 1000);
+
+    // ページ読み込み時に次のIDを取得して表示
+    window.onload = function () {
+        fetch('/next-id')
+            .then(response => response.json())
+            .then(data => {
+                const idDiv = document.getElementById('id');
+                idDiv.textContent = data.nextId; // 次のIDを表示
+            })
+            .catch(error => {
+                console.error('次のIDを取得できませんでした:', error);
+            });
+
+            timerStart();
+
+            timerValue = getTimerValue() || timerValue;
+
+            inputWaitTime();
+    };
+
     
+
+    function updateTimer() {
+            const timerElement = document.getElementById('wait_time');
+            let hours = Math.floor(timerValue / 3600);
+            let minutes = Math.floor((timerValue % 3600) / 60);
+            let seconds = timerValue % 60;
+            
+            timerElement.textContent = `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+    function saveTimerValue(timerValue) {
+        localStorage.setItem('timerValue', timerValue);
+    }
+
+    function getTimerValue() {
+        return parseInt(localStorage.getItem('timerValue'), 10) || 0;
+    }    
+         
+    let timerInterval;
+
+    function timerStart() {
+        timerInterval = setInterval(function() {
+            if(timerValue > 0) {
+                timerValue--;
+                updateTimer();
+            }
+        }, 1000)
+       }
+  
+    function addTelOrder() {
+      
+      <% for (let i = 0; i < data.length ; i++) { %>
+        let needMinutes<%- i %> =  <%= data[i].number / 10 + 5 %>;
+        let addTime<%- i %> =  {id:<%= data[i].id %>, number:<%= data[i].number / 10 %>, checked:<%= data[i].checked %>};
+        let timeToStart<%- i %> = new Date(new Date('<%= data[i].time %>') - needMinutes<%- i %> * 60 * 1000 );
+                                                                                             
+        if (wait_minutes > timeToStart<%- i %> && addTime<%- i %>.checked === 0) {
+        
+            timerValue += addTime<%- i %>.number * 60;                   
+                                                
+            wait_minutes = new Date(now.getTime() + timerValue * 1000 );
+                                          
+            window.location="/checked?id=" + addTime<%- i %>.id;
+          }
+        
+       <% } %>
+         
+  
+      }
+
+    function inputWaitTime() {
+        
+        // ローカルタイムを "YYYY-MM-DDTHH:mm" の形式に変換
+        wait_minutes = new Date(now.getTime() + timerValue * 1000 );
+        let year = wait_minutes.getFullYear();
+        let month = String(wait_minutes.getMonth() + 1).padStart(2, '0'); // 月は0始まり
+        let date = String(wait_minutes.getDate()).padStart(2, '0');
+        let hours = String(wait_minutes.getHours()).padStart(2, '0');
+        let minutes = String(wait_minutes.getMinutes()).padStart(2, '0');
+
+        // フォーマットした日時を生成
+        let localDateTime = `${year}-${month}-${date}T${hours}:${minutes}`;
+
+        // input 要素に設定
+        document.getElementById('time').value = localDateTime;
+        console.log(localDateTime)
+      }
+
+      
+
+    setInterval(function() {
+        addTelOrder();
+        
+    }, 1000 * 2);
+      
+    setInterval(function() {
+        saveTimerValue(timerValue)
+
+    }, 1000);
+
+    let switch_bt = document.getElementById('switch_bt');
+    let form = document.getElementById('form');
+    let grid5 = document.getElementById('grid-5');
+    switch_bt.addEventListener('click', function() {
+        
+        if(form.classList.contains('grid-5')) {
+            form.classList.remove('grid-5');
+            grid5.classList.add('grid-5')
+        } else {
+            form.classList.add('grid-5')
+            grid5.classList.remove('grid-5');
+        }
+    })
+
+    let s = 53;
+  
+    document.getElementById('1minute++').addEventListener('click', function(){
+              timerValue += 1 * s;
+              updateTimer();
+          });
+  
+    document.getElementById('1minute--').addEventListener('click', function(){
+              timerValue -= 1 * s;
+              updateTimer();
+          });
+        
+    document.getElementById('5minute++').addEventListener('click', function(){
+              timerValue += 5 * s;
+              updateTimer();
+          });
+        
+    document.getElementById('5minute--').addEventListener('click', function(){
+              timerValue -= 5 * s;
+              updateTimer();
+          });
+
+    const reset_bt = document.getElementById('reset-bt');
+    
+    function reset() {
+        const result = window.confirm('タイマーをリセットしますか？');
+        if(result) {
+            timerValue = 0;
+            window.location = "/";
+        }
+        
+    }
+
+
+
+
+
+    
+
+    
+</script>
 </body>
 </html>
