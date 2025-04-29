@@ -159,6 +159,13 @@
                 <input type="datetime-local" id="time" name="time"  class="grid-item grid-2"><br>
                 <label for="number" class="label-2">本数</label><br>
                 <input type="text" id="number" name="number" class="grid-item grid-3">
+                <label>
+                    <input type="checkbox" id="is_reservation_checkbox">
+                    予約注文
+                </label>
+                
+                <!-- チェックボックスの状態を反映する隠しフィールド -->
+                <input type="hidden" name="reservation" id="is_reservation" value="0">
                 <input type="submit" id="submit_bt" class="grid-item grid-4">
                 
             </form>
@@ -192,10 +199,51 @@
         <div class="grid-bt text-bt">+</div>
     </div>
 <script>
+
+    let timerValue = 0;
+    let now = new Date();
+    let tv = parseInt(timerValue, 10);
+    let wait_minutes = new Date(now.getTime() + tv * 1000);
+
+
+    const socket = new WebSocket('ws://localhost:3001');
+
+    socket.onopen = function() {
+        console.log("✅ WebSocket 接続成功");
+    }
+
+    socket.onmessage = function(event) {
+        const message = JSON.parse(event.data);
+        console.log("📩 タイマー値を受信:", message.timerValue);
+        // チェックボックスの状態に応じて `is_reservation` の値を変更
+        
+            if (message.type === 'update' && document.getElementById("is_reservation").checked === false ) {
+                console.log(document.getElementById("is_reservation").checked)
+                
+                    timerValue = message.timerValue;
+                    updateTimer();
+                    inputWaitTime();
+                }
+
+            
+            document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
+                if(this.checked === true) {
+                    console.log('hello')
+                    inputWaitTime = null;
+                }
+            })
+            }
+        
+        
+    
+
+    socket.onclose = function() {
+    console.log("❌ WebSocket 接続が切断されました");
+};
+
     const number = document.getElementById('number');
-
+    
   
-
     function addNumber(num) {
         number.value += num;
     }
@@ -204,10 +252,7 @@
         number.value = number.value.slice(0, -1);
     }
 
-    let timerValue = 0;
-    let now = new Date();
-    let tv = parseInt(timerValue, 10);
-    let wait_minutes = new Date(now.getTime() + tv * 1000);
+    
 
     // ページ読み込み時に次のIDを取得して表示
     window.onload = function () {
@@ -221,11 +266,9 @@
                 console.error('次のIDを取得できませんでした:', error);
             });
 
-            timerStart();
-
-            timerValue = getTimerValue() || timerValue;
 
             inputWaitTime();
+            console.log(timerValue)
     };
 
     
@@ -239,24 +282,8 @@
             timerElement.textContent = `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         }
 
-    function saveTimerValue(timerValue) {
-        localStorage.setItem('timerValue', timerValue);
-    }
-
-    function getTimerValue() {
-        return parseInt(localStorage.getItem('timerValue'), 10) || 0;
-    }    
+    
          
-    let timerInterval;
-
-    function timerStart() {
-        timerInterval = setInterval(function() {
-            if(timerValue > 0) {
-                timerValue--;
-                updateTimer();
-            }
-        }, 1000)
-       }
   
     function addTelOrder() {
       
@@ -267,9 +294,7 @@
                                                                                              
         if (wait_minutes > timeToStart<%- i %> && addTime<%- i %>.checked === 0) {
         
-            timerValue += addTime<%- i %>.number * 60;                   
-                                                
-            wait_minutes = new Date(now.getTime() + timerValue * 1000 );
+            socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60}))
                                           
             window.location="/checked?id=" + addTime<%- i %>.id;
           }
@@ -280,7 +305,6 @@
       }
 
     function inputWaitTime() {
-        
         // ローカルタイムを "YYYY-MM-DDTHH:mm" の形式に変換
         wait_minutes = new Date(now.getTime() + timerValue * 1000 );
         let year = wait_minutes.getFullYear();
@@ -294,7 +318,6 @@
 
         // input 要素に設定
         document.getElementById('time').value = localDateTime;
-        console.log(localDateTime)
       }
 
       
@@ -302,12 +325,8 @@
     setInterval(function() {
         addTelOrder();
         
-    }, 1000 * 2);
+    }, 1000 );
       
-    setInterval(function() {
-        saveTimerValue(timerValue)
-
-    }, 1000);
 
     let switch_bt = document.getElementById('switch_bt');
     let form = document.getElementById('form');
@@ -326,22 +345,22 @@
     let s = 53;
   
     document.getElementById('1minute++').addEventListener('click', function(){
-              timerValue += 1 * s;
+              socket.send(JSON.stringify({ action: 'increase', amount: 60}))
               updateTimer();
           });
   
     document.getElementById('1minute--').addEventListener('click', function(){
-              timerValue -= 1 * s;
+              socket.send(JSON.stringify({ action: 'increase', amount: -60}))
               updateTimer();
           });
         
     document.getElementById('5minute++').addEventListener('click', function(){
-              timerValue += 5 * s;
+              socket.send(JSON.stringify({ action: 'increase', amount: 300}))
               updateTimer();
           });
         
     document.getElementById('5minute--').addEventListener('click', function(){
-              timerValue -= 5 * s;
+              socket.send(JSON.stringify({ action: 'increase', amount: -300}))
               updateTimer();
           });
 
@@ -350,12 +369,16 @@
     function reset() {
         const result = window.confirm('タイマーをリセットしますか？');
         if(result) {
-            timerValue = 0;
-            window.location = "/";
+            socket.send(JSON.stringify({ action: 'reset'}))
         }
         
     }
 
+    document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
+        document.getElementById("is_reservation").value = this.checked ? "1" : "0";
+            });
+
+    
 
 
 

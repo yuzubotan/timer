@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <style>
+        body {
+            background-color: #bcffff;
+        }
+
+        td {
+        padding-right: 20px;
+      }
+      
+      .button {
+        text-align: center;
+      }
+      
+      table {
+        width: 100%;
+        border: 3px solid black;
+      }
+      
+      .cel {
+        padding: 5px;
+      }
+
+      .border {
+        border-bottom: 3px solid;
+      }
+</style>
+    </style>
+</head>
+<body>
+    <table border="2" style="border-collapse:collapse;">
+        <% for (let i in data) { %>
+           <tr>
+             <td rowspan="2" class="cel"><%= data[i].id %></td>
+             <td colspan="2" class="cel">受付<br><% const timeObject = new Date(data[i].orderedtime); %>
+                 <%= timeObject.toLocaleString('ja-JP',{hour: '2-digit', minute: '2-digit'}) %>
+                
+                  </td>
+             <td colspan="2" class="cel">完了予定 : 
+              <% if(data[i].reservation === 1){ %>
+                <% const timeObject = new Date(data[i].time) %>
+                <%= timeObject.toLocaleString('ja-JP',{hour: '2-digit', minute: '2-digit'}) %>
+                <% } else { %>
+                  <%= new Date(new Date(data[i].time).getTime() + data[i].number / 10 * 60 * 1000).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) %>
+                <% } %>                </td>
+             
+             <td><a href="javascript:del(<%= data[i].id %>)">[del]</a></td>
+          </tr>
+          <tr class="border">
+             <td class="cel"><%= data[i].number %>本</td>
+             <td class="cel"><%= data[i].number / 10 %>分</td>
+             <td colspan="2">開始時刻：<% if (data[i].reservation === 0) { %>
+              <%= new Date(data[i].time).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) %>
+            <% } else {%>
+              <%= new Date(new Date(data[i].time).getTime() - (data[i].number / 10 * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
+              <% } %>
+              </td>
+             <td colspan="2"><%= data[i].reservation %></td>
+             
+          </tr>
+         <% } %>
+       </table>
+       
+       <div class="button">
+         <button onclick="location.href='/'">TOP</button>
+       </div>
+          
+       <div class="button">
+         <a href="javascript:reset()">リセット</a>
+       </div>
+
+       <script>
+  
+  
+  
+        function del(id) {
+          let result = window.confirm('id=' + id + 'を削除しますか？');
+          if (result) {
+            window.location = "/order/del?id=" + id;
+          }
+        }
+        
+        function reset() {
+          let result = window.confirm('データベースをリセットしますか？');
+          if (result) {
+            // サーバーサイドのエンドポイントを呼び出す
+            fetch('/reset', { method: 'POST' })
+              .then(response => {
+                if (response.ok) {
+                  // リセット後にトップページにリダイレクト
+                  window.location = "/";
+                } else {
+                  console.error('データベースのリセットに失敗しました。');
+                }
+              })
+              .catch(error => {
+                console.error('ネットワークエラー:', error);
+              });
+          }
+        }
+        
+       
+      </script>
+</body>
+</html>
