@@ -200,10 +200,23 @@
     </div>
 <script>
 
-    let timerValue = 0;
-    let now = new Date();
-    let tv = parseInt(timerValue, 10);
-    let wait_minutes = new Date(now.getTime() + tv * 1000);
+let timerValue = 0;
+let now = new Date();
+let tv = parseInt(timerValue, 10);
+let wait_minutes = new Date(now.getTime() + tv * 1000);
+
+let timeInput = document.getElementById('time');
+let isUserEditingTime = false;
+
+// ユーザーが入力欄を操作し始めたらフラグON
+timeInput.addEventListener('focus', function () {
+    isUserEditingTime = true;
+});
+
+// 操作が終わったらフラグOFF
+timeInput.addEventListener('blur', function () {
+    isUserEditingTime = false;
+});
 
 
     const socket = new WebSocket('ws://localhost:3001');
@@ -215,24 +228,25 @@
     socket.onmessage = function(event) {
         const message = JSON.parse(event.data);
         console.log("📩 タイマー値を受信:", message.timerValue);
+        console.log('amount:', message)
         // チェックボックスの状態に応じて `is_reservation` の値を変更
         
             if (message.type === 'update' && document.getElementById("is_reservation").checked === false ) {
-                console.log(document.getElementById("is_reservation").checked)
-                
+                console.log(wait_minutes)
                     timerValue = message.timerValue;
                     updateTimer();
-                    inputWaitTime();
-                }
+                    if (!isUserEditingTime) inputWaitTime();  // 入力中でなければ上書き
+                } 
 
-            
-            document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
-                if(this.checked === true) {
-                    console.log('hello')
-                    inputWaitTime = null;
-                }
-            })
+            if (message.type === 'gap') {
+                console.log('gap送信',timerValue)
+                socket.send(JSON.stringify({ action: 'increase', amount: message.amount}))
             }
+            document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
+                document.getElementById("is_reservation").value = this.checked ? "1" : "0";
+                inputWaitTime();
+                }
+            )}
         
         
     
@@ -268,7 +282,7 @@
 
 
             inputWaitTime();
-            console.log(timerValue)
+           
     };
 
     
@@ -283,26 +297,54 @@
         }
 
     
-         
+    let gapSent = false;
   
     function addTelOrder() {
-      
-      <% for (let i = 0; i < data.length ; i++) { %>
-        let needMinutes<%- i %> =  <%= data[i].number / 10 + 5 %>;
-        let addTime<%- i %> =  {id:<%= data[i].id %>, number:<%= data[i].number / 10 %>, checked:<%= data[i].checked %>};
-        let timeToStart<%- i %> = new Date(new Date('<%= data[i].time %>') - needMinutes<%- i %> * 60 * 1000 );
-                                                                                             
-        if (wait_minutes > timeToStart<%- i %> && addTime<%- i %>.checked === 0) {
-        
-            socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60}))
-                                          
-            window.location="/checked?id=" + addTime<%- i %>.id;
-          }
-        
-       <% } %>
-         
-  
-      }
+
+    let earliestReservationStart = null;
+    
+    <% for (let i = 0; i < data.length ; i++) { %>
+        let needMinutes<%- i %> = <%= data[i].number / 10 + 5 %>; // 本数 ÷10 +5分
+        let addTime<%- i %> = { 
+            id: <%= data[i].id %>, 
+            number: <%= data[i].number / 10 %>, 
+            checked: <%= data[i].checked %>, 
+            reservation: <%= data[i].reservation %>, 
+            time: new Date('<%= data[i].time %>')
+        };
+        let timeToStart<%- i %> = new Date(addTime<%- i %>.time.getTime() - needMinutes<%- i %> * 60 * 1000);
+
+        // ① 予約注文の最も早い開始時刻を記録
+        if (addTime<%- i %>.reservation === 1) {
+            if (!earliestReservationStart || timeToStart<%- i %> < earliestReservationStart) {
+                earliestReservationStart = timeToStart<%- i %>;
+                
+            };
+        }
+
+        // ② 通常注文が予約前に入れられるなら送信してタイマー更新
+        if (
+            addTime<%- i %>.checked === 0 &&
+            addTime<%- i %>.reservation === 0
+        ) {
+            if (!earliestReservationStart || wait_minutes < earliestReservationStart) {
+                // ✅ 予約の前に入れられる
+                
+                socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60 }));
+                window.location = "/checked?id=" + addTime<%- i %>.id;
+                
+            } 
+            
+        }
+        if (wait_minutes > timeToStart<%- i %> && addTime<%- i %>.checked === 0 && addTime<%- i %>.reservation === 1) {
+       
+       socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60}))
+                                    
+       window.location="/checked?id=" + addTime<%- i %>.id;
+     }
+    <% } %>
+}
+
 
     function inputWaitTime() {
         // ローカルタイムを "YYYY-MM-DDTHH:mm" の形式に変換
@@ -323,9 +365,10 @@
       
 
     setInterval(function() {
+        wait_minutes = new Date(new Date().getTime() + timerValue * 1000); // 最新に更新
         addTelOrder();
         
-    }, 1000 );
+    }, 1000);
       
 
     let switch_bt = document.getElementById('switch_bt');
@@ -342,7 +385,7 @@
         }
     })
 
-    let s = 53;
+    let s = 55;
   
     document.getElementById('1minute++').addEventListener('click', function(){
               socket.send(JSON.stringify({ action: 'increase', amount: 60}))

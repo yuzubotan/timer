@@ -33,6 +33,7 @@
     </style>
 </head>
 <body>
+  <div id="wait_time">0:00:00</div>
     <table border="2" style="border-collapse:collapse;">
         <% for (let i in data) { %>
            <tr>
@@ -42,25 +43,22 @@
                 
                   </td>
              <td colspan="2" class="cel">完了予定 : 
-              <% if(data[i].reservation === 1){ %>
-                <% const timeObject = new Date(data[i].time) %>
-                <%= timeObject.toLocaleString('ja-JP',{hour: '2-digit', minute: '2-digit'}) %>
-                <% } else { %>
-                  <%= new Date(new Date(data[i].time).getTime() + data[i].number / 10 * 60 * 1000).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) %>
-                <% } %>                </td>
+                <% const timeObject2 = new Date(data[i].time) %>
+                <%= timeObject2.toLocaleString('ja-JP',{hour: '2-digit', minute: '2-digit'}) %>
+             </td>
              
              <td><a href="javascript:del(<%= data[i].id %>)">[del]</a></td>
           </tr>
           <tr class="border">
              <td class="cel"><%= data[i].number %>本</td>
              <td class="cel"><%= data[i].number / 10 %>分</td>
-             <td colspan="2">開始時刻：<% if (data[i].reservation === 0) { %>
-              <%= new Date(data[i].time).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) %>
-            <% } else {%>
+             <td colspan="2">開始時刻：<% if(data[i].reservation == 0) { %>
               <%= new Date(new Date(data[i].time).getTime() - (data[i].number / 10 * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
+              <% } else { %>
+                <%= new Date(new Date(data[i].time).getTime() - ((data[i].number / 10 + 5) * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
               <% } %>
               </td>
-             <td colspan="2"><%= data[i].reservation %></td>
+             <td colspan="2"><%= data[i].checked %>:<%= data[i].reservation %></td>
              
           </tr>
          <% } %>
@@ -75,20 +73,38 @@
        </div>
 
        <script>
-  
+  const socket = new WebSocket('ws://localhost:3001');
+
+  socket.onmessage = function(event) {
+        const message = JSON.parse(event.data)
+        if(message.type === "update") {
+          let timerValue = message.timerValue;
+          let hours = Math.floor(timerValue / 3600);
+          let minutes = Math.floor((timerValue % 3600) / 60);
+          let seconds = timerValue % 60;
+
+          document.getElementById('wait_time').textContent = `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        if(message.type === 'del') {
+          socket.send(JSON.stringify({ action: 'increase', amount: message.amount }));
+        }
+      }
   
   
         function del(id) {
           let result = window.confirm('id=' + id + 'を削除しますか？');
           if (result) {
-            window.location = "/order/del?id=" + id;
+            window.location = "/timeline/del?id=" + id;
           }
         }
         
         function reset() {
           let result = window.confirm('データベースをリセットしますか？');
           if (result) {
+            socket.send(JSON.stringify({action: "reset"}));
             // サーバーサイドのエンドポイントを呼び出す
+
             fetch('/reset', { method: 'POST' })
               .then(response => {
                 if (response.ok) {

@@ -145,7 +145,6 @@
              
                <% const currentTime = new Date();
                              let itemTop = 250 + ((Math.floor(item.hour * 12) + Math.floor(item.minutes / 5)) * 200 + (item.minutes % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
-                             let itemTop2 = 250 + ((Math.floor(item.hour * 12) + Math.floor((item.minutes - item.number / 10) / 5)) * 200 + ((item.minutes - item.number / 10) % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
                           %>
               
                           <% if(itemTop >= 0) { %>
@@ -156,16 +155,15 @@
                                     <span class="point">●</span><span class="id"><%= item.id %></span>
                                     <button class="bt" onclick="javascript:del(<%= item.id %>, <%= item.number %>)">DEL</button>
                                     <span class="order">時刻:<%= item.datetime %> 本数:<%= item.number %></span>
-                                    <button class="bt">OK</button>
+                                    <button class="bt" id="ok" onclick="javascript:modify(<%= item.id %>,<%= item.number %>)">OK</button>
                                   </div>
                                 <% } else {%>
-                                  <div class="data-item" style="top: <%= itemTop2 %>px">
+                                  <div class="data-item" style="top: <%= itemTop %>px">
                                     <span class="point">●</span><span class="id"><%= item.id %></span>
                                     <button class="bt" onclick="javascript:del(<%= item.id %>, <%= item.number %>)">DEL</button>
-                                    <span class="order" style="background-color: lightblue;">時刻:
-                                    
-                                    <%= item.datetime2 %> 本数:<%= item.number %></span>
-                                    <button class="bt">OK</button>
+                                    <span class="order" style="background-color: lightblue;">
+                                      時刻:<%= item.datetime %> 本数:<%= item.number %></span>
+                                    <button class="bt" onclick="javascript:modify(<%= item.id %>,<%= item.number %>)"">OK</button>
                                   </div>
                                 <% } %>
                                     
@@ -182,13 +180,18 @@
 
       socket.onmessage = function(event) {
         const message = JSON.parse(event.data)
-        let timerValue = message.timerValue;
-        let hours = Math.floor(timerValue / 3600);
-        let minutes = Math.floor((timerValue % 3600) / 60);
-        let seconds = timerValue % 60;
+        if(message.type === "update") {
+          let timerValue = message.timerValue;
+          let hours = Math.floor(timerValue / 3600);
+          let minutes = Math.floor((timerValue % 3600) / 60);
+          let seconds = timerValue % 60;
 
           document.getElementById('wait_time').textContent = `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        
+        }
+
+        if(message.type === 'del') {
+          socket.send(JSON.stringify({ action: 'increase', amount: message.amount }));
+        }
       }
             // タイムラインコンテナ
 const timeline = document.querySelector('.timeline');
@@ -247,7 +250,15 @@ function del(id, number) {
           }
         }
 
-console.log(timeToAdjust)
+function modify(id, number) {
+  
+  let result = window.confirm('id=' + id + 'が出来上がりましたか？');
+  if(result) {
+    
+    window.location = "/timeline/modify?id=" + id;
+  }
+  document.getElementById('ok').style.opacity = 0.2;
+}
 
     </script>
 </body>
