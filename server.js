@@ -92,43 +92,61 @@ app.get('/next-id', (req, res) => {
     });
 });
 
-
 app.get('/timeline', (req, res) => {
-    const sql = "select * from form_data order by orderedtime asc";
-    db.all(sql, [], (err, rows) => {
-        if(err) {
-            console.log('Database query error:', err.message);
-            return res.status(500).send('Database query error');
-        }
-        
-        const data = rows.map(row => {
-            
-            const date = new Date(Date.parse(row.time)); // まず正しいDateを得る
+  const sql = "SELECT * FROM form_data ORDER BY time ASC";
+  db.all(sql, [], (err, rows) => {
+      if (err) {
+          console.log('Database query error:', err.message);
+          return res.status(500).send('Database query error');
+      }
 
-            const formattedTime = date.toLocaleString('jp-JP', {
-              hour: '2-digit',
-              minute: '2-digit'
-             });
-             
-            return {
+      const data = rows.map(row => {
+          let reserveTime = null;
+          let completionTime = null;
+          let startTime = null;
+
+          const prepDurationMs = (row.number / 10) * 60000; // 調理時間
+
+          if (row.reservation === 1) {
+              // 予約注文
+              reserveTime = new Date(Date.parse(row.time)); // DBに保存された予約時刻
+              completionTime = new Date(reserveTime.getTime() - 5 * 60000); // 完了時刻は5分前
+              startTime = new Date(completionTime.getTime() - prepDurationMs); // 開始時刻
+          } else {
+              // 非予約注文
+              completionTime = new Date(Date.parse(row.time)); // DBに保存された完了時刻
+              startTime = new Date(completionTime.getTime() - prepDurationMs); // 開始時刻
+          }
+
+          return {
               id: row.id,
-              datetime: formattedTime,
               number: row.number,
-              hour: date.getHours(),
-              minutes: date.getMinutes(),
-              reservation: row.reservation
-            };
-          });
-          
+              reservation: row.reservation,
+              reserveTime: reserveTime ? reserveTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}) : null,
+              completionTime: completionTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}),
+              startTime: startTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}),
+              hour: startTime.getHours(),
+              minutes: startTime.getMinutes()
+          };
+      });
+
+      // 開始時刻で並び替え
+      data.sort((a, b) => {
+          return (a.hour * 60 + a.minutes) - (b.hour * 60 + b.minutes);
+      });
+
       res.render('timeline.ejs', { title: 'timeline', data });
-    })
+  });
+});
+
+
     
     
-})
+
 
 function calculateTimes(order, reservations) {
   const prepDurationMs = (order.number / 10) * 60000;
-
+  let gapMs = 0;
   if (order.reservation === 1) {
     // 予約注文
     const resTime = new Date(order.time);       // ユーザー指定の予約時刻
@@ -148,57 +166,79 @@ function calculateTimes(order, reservations) {
 
       const overlap = startTime < resEnd && endTime > resStart;
       if (overlap) {
-        // 非予約を予約完成直後にずらす
+        gapMs = resStart - startTime;
+        console.log('resStart:', resStart);
+        console.log('startTime:',startTime);
         startTime = new Date(resEnd);
         endTime = new Date(startTime.getTime() + prepDurationMs);
+        
       }
     }
-    return { startTime, endTime, saveTime: endTime }; // DBには完了時刻を保存
+    return { startTime, endTime, saveTime: endTime, gapMs }; // DBには完了時刻を保存
   }
 }
 
 
 
-app.post('/submit', (req, res) => {
-  const { time, number, reservation } = req.body;
-  const orderedtime = new Date();
 
-  const sqlSelect = `SELECT time, number FROM form_data WHERE reservation = 1 ORDER BY time ASC`;
-
-  db.all(sqlSelect, [], (err, reservations) => {
-    if (err) {
-      console.error("予約データ取得エラー:", err.message);
-      return res.status(500).send("予約データ取得中にエラーが発生しました。");
-    }
-
-    const order = {
-      time,
-      number: Number(number),
-      reservation: Number(reservation)
-    };
-
-    const { saveTime } = calculateTimes(order, reservations);
-
-    const sqlInsert = `
-      INSERT INTO form_data (time, orderedtime, number, reservation)
-      VALUES (?, ?, ?, ?)
-    `;
-    const values = [
-      saveTime.toISOString(),     // 予約なら予約時刻、非予約なら完了時刻
-      orderedtime.toISOString(),
-      order.number,
-      order.reservation
-    ];
-
-    db.run(sqlInsert, values, (err) => {
+  app.post('/submit', (req, res) => {
+    const { time, number, reservation } = req.body;
+    const orderedtime = new Date();
+    
+  
+    const sqlSelect = `SELECT time, number FROM form_data WHERE reservation = 1 ORDER BY time ASC`;
+  
+    db.all(sqlSelect, [], (err, reservations) => {
       if (err) {
-        console.error("データ保存エラー:", err.message);
-        return res.status(500).send("データ保存中にエラーが発生しました。");
+        console.error("予約データ取得エラー:", err.message);
+        return res.status(500).send("予約データ取得中にエラーが発生しました。");
       }
-      res.redirect("/");
+  
+      const order = {
+        time,
+        number: Number(number),
+        reservation: Number(reservation)
+      };
+  
+      const { saveTime, gapMs } = calculateTimes(order, reservations);
+      
+      const sqlInsert = `
+        INSERT INTO form_data (time, orderedtime, number, reservation)
+        VALUES (?, ?, ?, ?)
+      `;
+      const values = [
+        saveTime.toISOString(),     // 予約なら予約時刻、非予約なら完了時刻
+        orderedtime.toISOString(),
+        order.number,
+        order.reservation
+      ];
+  
+      db.run(sqlInsert, values, (err) => {
+        if (err) {
+          console.error("データ保存エラー:", err.message);
+          return res.status(500).send("データ保存中にエラーが発生しました。");
+        }
+        const wss = req.app.locals.wss;
+        
+        console.log("🧪 req.app.locals.wss exists:", !!req.app.locals.wss);
+        if (gapMs > 0 && wss) {
+          
+          console.log('yes')
+          const message = JSON.stringify({ type: 'gap', amount: Math.floor(gapMs / 1000)});
+          wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
+
+
+        }
+        res.redirect("/");
+      });
     });
   });
-});
+  
+
 
 
 
@@ -229,63 +269,102 @@ app.get("/order", (req,res) => {
     })
   })
 
-  app.get('/timeline/del', (req, res) => {
-    const id = req.query.id;
-    
-    if (!id) {
-        return res.status(400).send('IDが指定されていません。');
-    }
+  // 削除処理
+app.get('/timeline/del', (req, res) => {
+  const id = req.query.id;
 
-    // 1. 削除対象の注文を取得
-    db.get('SELECT * FROM form_data WHERE id = ?', [id], (err, canceledOrder) => {
-        if (err) {
-            console.error('注文取得エラー:', err.message);
-            return res.status(500).send('注文取得に失敗しました。');
-        }
+  // まず削除対象を取得
+  const sqlGet = `SELECT * FROM form_data WHERE id = ?`;
+  db.get(sqlGet, [id], (err, deletedRow) => {
+      if (err) {
+          console.error('削除対象取得エラー:', err.message);
+          return res.status(500).send('削除対象取得エラー');
+      }
 
-        if (!canceledOrder) {
-            return res.status(404).send('注文が存在しません。');
-        }
+      if (!deletedRow) {
+          return res.redirect('/timeline');
+      }
 
+      // 削除実行
+      const sqlDelete = `DELETE FROM form_data WHERE id = ?`;
+      db.run(sqlDelete, [id], (err) => {
+          if (err) {
+              console.error('削除エラー:', err.message);
+              return res.status(500).send('削除中にエラーが発生しました');
+          }
 
-        // 2. 削除処理
-        db.run('DELETE FROM form_data WHERE id = ?', [id], (err) => {
-            if (err) {
-                console.error('削除エラー:', err.message);
-                return res.status(500).send('削除に失敗しました。');
-            } else {
-              const wss = req.app.locals.wss;
-              if(wss) {
-                const message = JSON.stringify({ type: 'del', amount: -canceledOrder.number / 10 * 60 });
-                wss.clients.forEach((client) => {
-                  if(client.readyState === WebSocket.OPEN) {
-                    client.send(message);
-                  }
-                })
+          // 削除後に再計算
+          const sqlAll = `SELECT * FROM form_data ORDER BY time ASC`;
+          db.all(sqlAll, [], (err, rows) => {
+              if (err) {
+                  console.error('再計算用データ取得エラー:', err.message);
+                  return res.status(500).send('再計算用データ取得中にエラーが発生しました');
               }
-            }
 
-            // 3. キャンセルされたcompletion_time以降の注文を取得
-            db.all(
-                'SELECT * FROM form_data WHERE time >= ? ORDER BY time ASC',
-                [canceledOrder.time],
-                (err, subsequentOrders) => {
-                    if (err) {
-                        console.error('注文取得エラー:', err.message);
-                        return res.status(500).send('後続注文取得に失敗しました。');
-                    }
-                    console.log('canceledOrder;', canceledOrder);
-                    console.log('subsequentOrders:', subsequentOrders);
-                    // 4. 後続注文の調整
-                    adjustOrders(subsequentOrders, canceledOrder, () => {
-                      
-                        res.redirect('/timeline');
-                    });
-                }
-            );
-        });
-    });
+              // 予約だけ抽出
+              const reservations = rows.filter(r => r.reservation === 1).map(r => {
+                  const reserveTime = new Date(r.time); // 予約時刻
+                  const cookMs = (r.number / 10) * 60000;
+                  const readyTime = new Date(reserveTime.getTime() - 5 * 60000);
+                  const startTime = new Date(readyTime.getTime() - cookMs);
+                  return { id: r.id, startTime, readyTime, reserveTime, cookMs };
+              });
+
+              // 非予約を削除対象の orderedtime より後ろだけ調整
+              const deletedOrdered = new Date(deletedRow.orderedtime);
+              let updatedRows = [];
+
+              let timeline = []; // 調整後タイムライン
+
+              for (const row of rows) {
+                  const cookMs = (row.number / 10) * 60000;
+
+                  if (row.reservation === 1) {
+                      // 予約はそのまま
+                      timeline.push({
+                          ...row,
+                          completion: new Date(new Date(row.time).getTime() - 5 * 60000)
+                      });
+                      continue;
+                  }
+
+                  // 非予約
+                  const ordered = new Date(row.orderedtime);
+                  let completion = new Date(row.time); // 保存されている完了時刻
+                  let start = new Date(completion.getTime() - cookMs);
+
+                  // 削除対象より後だけ再調整
+                  if (ordered > deletedOrdered) {
+                      for (const resv of reservations) {
+                          const overlap = start < resv.readyTime && completion > resv.startTime;
+                          if (overlap) {
+                              // 予約の直後に開始
+                              start = new Date(resv.readyTime);
+                              completion = new Date(start.getTime() + cookMs);
+                          }
+                      }
+                  }
+
+                  timeline.push({ ...row, completion, start });
+                  updatedRows.push({ id: row.id, completion });
+              }
+
+              // DBを更新
+              const sqlUpdate = `UPDATE form_data SET time = ? WHERE id = ?`;
+              updatedRows.forEach(u => {
+                  db.run(sqlUpdate, [u.completion.toISOString(), u.id], (err) => {
+                      if (err) {
+                          console.error('再計算更新エラー:', err.message);
+                      }
+                  });
+              });
+
+              res.redirect('/timeline');
+          });
+      });
+  });
 });
+
 
 // 後続注文を調整する関数（予約優先＋通常注文は調理時間分ずらす）
 function adjustOrders(subsequentOrders, canceledOrder, callback) {

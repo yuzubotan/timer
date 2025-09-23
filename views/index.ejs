@@ -301,9 +301,9 @@ timeInput.addEventListener('blur', function () {
   
     function addTelOrder() {
 
-    let earliestReservationStart = null;
+      let earliestReservationStart = null;
     
-    <% for (let i = 0; i < data.length ; i++) { %>
+      <% for (let i = 0; i < data.length ; i++) { %>
         let needMinutes<%- i %> = <%= data[i].number / 10 + 5 %>; // 本数 ÷10 +5分
         let addTime<%- i %> = { 
             id: <%= data[i].id %>, 
@@ -369,6 +369,7 @@ timeInput.addEventListener('blur', function () {
         addTelOrder();
         
     }, 1000);
+
       
 
     let switch_bt = document.getElementById('switch_bt');
@@ -422,7 +423,9 @@ timeInput.addEventListener('blur', function () {
             });
 
     
-
+    setInterval(function() {
+        window.location.reload()
+      }, 1000 * 60)
 
 
 
