@@ -167,10 +167,17 @@ function calculateTimes(order, reservations) {
       const overlap = startTime < resEnd && endTime > resStart;
       if (overlap) {
         gapMs = resStart - startTime;
-        console.log('resStart:', resStart);
-        console.log('startTime:',startTime);
-        startTime = new Date(resEnd);
-        endTime = new Date(startTime.getTime() + prepDurationMs);
+        
+        if (prepDurationMs <= gapMs) {
+          // gap に収まる → gap 内に補正して保存
+          endTime = new Date(startTime.getTime() - gapMs + prepDurationMs);
+          gapMs = 0; // timerValue は増やさない
+        } else {
+          // gap に収まらない → gap 分ずらして保存
+          startTime = new Date(resEnd);
+          endTime = new Date(startTime.getTime() + prepDurationMs);
+          // gapMs は「待ち時間の追加」として送信
+        }
         
       }
     }
@@ -201,6 +208,20 @@ function calculateTimes(order, reservations) {
       };
   
       const { saveTime, gapMs } = calculateTimes(order, reservations);
+
+      const wss = req.app.locals.wss;
+      
+      if (gapMs > 0 && wss) {
+        console.log("gapMs:",gapMs)
+        const message = JSON.stringify({ type: 'gap', amount: Math.floor(gapMs / 1000)});
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+              client.send(message);
+          }
+      });
+
+
+      }
       
       const sqlInsert = `
         INSERT INTO form_data (time, orderedtime, number, reservation)
@@ -218,21 +239,7 @@ function calculateTimes(order, reservations) {
           console.error("データ保存エラー:", err.message);
           return res.status(500).send("データ保存中にエラーが発生しました。");
         }
-        const wss = req.app.locals.wss;
-        
-        console.log("🧪 req.app.locals.wss exists:", !!req.app.locals.wss);
-        if (gapMs > 0 && wss) {
-          
-          console.log('yes')
-          const message = JSON.stringify({ type: 'gap', amount: Math.floor(gapMs / 1000)});
-          wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
-            }
-        });
-
-
-        }
+      
         res.redirect("/");
       });
     });
