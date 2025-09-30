@@ -142,11 +142,11 @@ app.get('/timeline', (req, res) => {
 
     
     
-
+let gapMs = 0;
 
 function calculateTimes(order, reservations) {
   const prepDurationMs = (order.number / 10) * 60000;
-  let gapMs = 0;
+  
   if (order.reservation === 1) {
     // 予約注文
     const resTime = new Date(order.time);       // ユーザー指定の予約時刻
@@ -168,18 +168,21 @@ function calculateTimes(order, reservations) {
       if (overlap) {
         gapMs = resStart - startTime;
         
-        if (prepDurationMs <= gapMs) {
-          // gap に収まる → gap 内に補正して保存
-          endTime = new Date(startTime.getTime() - gapMs + prepDurationMs);
-          gapMs = 0; // timerValue は増やさない
-        } else {
+        
           // gap に収まらない → gap 分ずらして保存
           startTime = new Date(resEnd);
           endTime = new Date(startTime.getTime() + prepDurationMs);
           // gapMs は「待ち時間の追加」として送信
-        }
+        
         
       }
+      
+      if (prepDurationMs <= gapMs) {
+        // gap に収まる → gap 内に補正して保存
+        startTime = new Date(resStart.getTime() - gapMs);
+        endTime = new Date(startTime.getTime() + prepDurationMs);
+        gapMs = 0; // timerValue は増やさない
+      } 
     }
     return { startTime, endTime, saveTime: endTime, gapMs }; // DBには完了時刻を保存
   }
@@ -208,11 +211,11 @@ function calculateTimes(order, reservations) {
       };
   
       const { saveTime, gapMs } = calculateTimes(order, reservations);
-
+      
       const wss = req.app.locals.wss;
       
       if (gapMs > 0 && wss) {
-        console.log("gapMs:",gapMs)
+        console.log('gapMs:',gapMs)
         const message = JSON.stringify({ type: 'gap', amount: Math.floor(gapMs / 1000)});
         wss.clients.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -239,7 +242,6 @@ function calculateTimes(order, reservations) {
           console.error("データ保存エラー:", err.message);
           return res.status(500).send("データ保存中にエラーが発生しました。");
         }
-      
         res.redirect("/");
       });
     });
