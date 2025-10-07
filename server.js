@@ -143,47 +143,78 @@ app.get('/timeline', (req, res) => {
     
     
 let gapMs = 0;
+let previousGapMs = 0;
 
 function calculateTimes(order, reservations) {
   const prepDurationMs = (order.number / 10) * 60000;
-  
+  const now = new Date(); // 現在時刻を取得
+
   if (order.reservation === 1) {
     // 予約注文
     const resTime = new Date(order.time);       // ユーザー指定の予約時刻
     const endTime = new Date(resTime.getTime() - 5 * 60000); // 完成は予約の5分前
     const startTime = new Date(endTime.getTime() - prepDurationMs);
-    return { startTime, endTime, saveTime: resTime }; // DBには予約時刻を保存
+    return { startTime, endTime, saveTime: resTime, gapMs: 0 }; // DBには予約時刻を保存
   } else {
     // 非予約注文
     let startTime = new Date(order.time);
     let endTime = new Date(startTime.getTime() + prepDurationMs);
 
-    for (const row of reservations) {
-      const resTime = new Date(row.time);          // DBに保存された予約時刻
-      const resEnd = new Date(resTime.getTime() - 5 * 60000); // 実際の完成時刻
-      const resPrepMs = (row.number / 10) * 60000;
-      const resStart = new Date(resEnd.getTime() - resPrepMs);
 
-      const overlap = startTime < resEnd && endTime > resStart;
-      if (overlap) {
-        gapMs = resStart - startTime;
+for (const row of reservations) {
+  const resTime = new Date(row.time);
+  const resEnd = new Date(resTime.getTime() - 5 * 60000);
+  const resPrepMs = (row.number / 10) * 60000;
+  const resStart = new Date(resEnd.getTime() - resPrepMs);
+
+  const overlap = startTime < resEnd && endTime > resStart;
+  
+  if (overlap) { 
+    if (startTime < now) { 
+      gapMs = Math.max(0, resStart - now);
+      console.log('ovelap:', gapMs) // 実際の残り時間 
+    } else { 
+      gapMs = Math.max(0, resStart - startTime);
+      console.log('ovelap2:', gapMs) // 予定上の gap }
+} 
+        startTime = new Date(resEnd); 
+        endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
         
-        
-          // gap に収まらない → gap 分ずらして保存
-          startTime = new Date(resEnd);
-          endTime = new Date(startTime.getTime() + prepDurationMs);
-          // gapMs は「待ち時間の追加」として送信
-        
-        
-      }
-      
-      if (prepDurationMs <= gapMs) {
-        // gap に収まる → gap 内に補正して保存
-        startTime = new Date(resStart.getTime() - gapMs);
-        endTime = new Date(startTime.getTime() + prepDurationMs);
-        gapMs = 0; // timerValue は増やさない
-      } 
     }
+  if (prepDurationMs <= gapMs) { // gap に収まる → gap 内に補正して保存 
+        console.log('prepDurationMs <= gapMs gapMs:', gapMs)
+        startTime = new Date(resStart.getTime() - gapMs); 
+        endTime = new Date(startTime.getTime() + prepDurationMs); 
+        if (startTime <= now) {
+          gapMs = Math.max(0, resStart - now); // 実際の残り時間
+          startTime = new Date(now); 
+          endTime = new Date(startTime.getTime() + prepDurationMs); 
+          console.log('resTime:', resTime)
+          console.log('startTime:', startTime)
+          console.log('resStart:', resStart);
+          console.log('endTime:', endTime);
+          if (overlap) { 
+      
+            startTime = new Date(resEnd); 
+            endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
+          
+    }
+          } else { 
+            gapMs = Math.max(0, resStart - startTime); // 予定上の gap 
+          } // gap に収まらない → gap 分ずらして保存 
+        gapMs = gapMs - prepDurationMs; // timerValue は増やさない 
+        if(gapMs < 0) {
+          gapMs = 0;
+        }
+        order.reservation = 2; 
+        
+    } 
+     
+      
+    
+    
+}
+
     return { startTime, endTime, saveTime: endTime, gapMs }; // DBには完了時刻を保存
   }
 }
@@ -194,7 +225,7 @@ function calculateTimes(order, reservations) {
   app.post('/submit', (req, res) => {
     const { time, number, reservation } = req.body;
     const orderedtime = new Date();
-    
+    console.log('previousGapMs:', previousGapMs)
   
     const sqlSelect = `SELECT time, number FROM form_data WHERE reservation = 1 ORDER BY time ASC`;
   
@@ -213,8 +244,9 @@ function calculateTimes(order, reservations) {
       const { saveTime, gapMs } = calculateTimes(order, reservations);
       
       const wss = req.app.locals.wss;
-      
-      if (gapMs > 0 && wss) {
+      console.log('gapMs:',gapMs)
+      console.log('previousGapMs:', previousGapMs)
+      if (gapMs > previousGapMs && wss) {
         console.log('gapMs:',gapMs)
         const message = JSON.stringify({ type: 'gap', amount: Math.floor(gapMs / 1000)});
         wss.clients.forEach((client) => {
@@ -225,6 +257,8 @@ function calculateTimes(order, reservations) {
 
 
       }
+
+      previousGapMs = gapMs;
       
       const sqlInsert = `
         INSERT INTO form_data (time, orderedtime, number, reservation)
