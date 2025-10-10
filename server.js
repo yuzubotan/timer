@@ -144,6 +144,7 @@ app.get('/timeline', (req, res) => {
     
 let gapMs = 0;
 let previousGapMs = 0;
+let previousprepDurationMs = 0;
 
 function calculateTimes(order, reservations) {
   const prepDurationMs = (order.number / 10) * 60000;
@@ -181,6 +182,7 @@ for (const row of reservations) {
         endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
         
     }
+
   if (prepDurationMs <= gapMs) { // gap に収まる → gap 内に補正して保存 
         console.log('prepDurationMs <= gapMs gapMs:', gapMs)
         startTime = new Date(resStart.getTime() - gapMs); 
@@ -189,24 +191,31 @@ for (const row of reservations) {
           gapMs = Math.max(0, resStart - now); // 実際の残り時間
           startTime = new Date(now); 
           endTime = new Date(startTime.getTime() + prepDurationMs); 
+        
           console.log('resTime:', resTime)
           console.log('startTime:', startTime)
           console.log('resStart:', resStart);
           console.log('endTime:', endTime);
-          if (overlap) { 
+          console.log(123)
+          order.reservation = 2; 
+          if (startTime < resEnd && endTime > resStart) { 
       
-            startTime = new Date(resEnd); 
+            startTime = new Date(now.getTime() + timerValue * 1000); 
             endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
-          
+            order.reservation = 0;
+          console.log(1234)
     }
           } else { 
             gapMs = Math.max(0, resStart - startTime); // 予定上の gap 
+            order.reservation = 2; 
+            gapMs = gapMs - prepDurationMs; // timerValue は増やさない
           } // gap に収まらない → gap 分ずらして保存 
-        gapMs = gapMs - prepDurationMs; // timerValue は増やさない 
+         
         if(gapMs < 0) {
           gapMs = 0;
+        
         }
-        order.reservation = 2; 
+        
         
     } 
      
