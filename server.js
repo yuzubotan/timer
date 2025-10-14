@@ -174,8 +174,9 @@ for (const row of reservations) {
     if (startTime < now) { 
       gapMs = Math.max(0, resStart - now);
       console.log('ovelap:', gapMs) // 実際の残り時間 
+      previousprepDurationMs = gapMs
     } else { 
-      gapMs = Math.max(0, resStart - startTime);
+      gapMs = Math.max(previousprepDurationMs, resStart - startTime);
       console.log('ovelap2:', gapMs) // 予定上の gap }
 } 
         startTime = new Date(resEnd); 
@@ -188,8 +189,10 @@ for (const row of reservations) {
         startTime = new Date(resStart.getTime() - gapMs); 
         endTime = new Date(startTime.getTime() + prepDurationMs); 
         if (startTime <= now) {
+          console.log('gap1:', gapMs);
           gapMs = Math.max(0, resStart - now); // 実際の残り時間
-          startTime = new Date(now); 
+          console.log('gapMs:', gapMs);
+          startTime = new Date(resStart.getTime() - gapMs); 
           endTime = new Date(startTime.getTime() + prepDurationMs); 
         
           console.log('resTime:', resTime)
@@ -197,18 +200,18 @@ for (const row of reservations) {
           console.log('resStart:', resStart);
           console.log('endTime:', endTime);
           console.log(123)
-          order.reservation = 2; 
+          
           if (startTime < resEnd && endTime > resStart) { 
       
             startTime = new Date(now.getTime() + timerValue * 1000); 
             endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
             order.reservation = 0;
-          console.log(1234)
+          console.log('gap3:', gapMs);
     }
           } else { 
-            gapMs = Math.max(0, resStart - startTime); // 予定上の gap 
             order.reservation = 2; 
             gapMs = gapMs - prepDurationMs; // timerValue は増やさない
+            console.log('gapMs4', gapMs);
           } // gap に収まらない → gap 分ずらして保存 
          
         if(gapMs < 0) {
