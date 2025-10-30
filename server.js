@@ -161,7 +161,6 @@ function calculateTimes(order, reservations) {
     let startTime = new Date(order.time);
     let endTime = new Date(startTime.getTime() + prepDurationMs);
 
-
 for (const row of reservations) {
   const resTime = new Date(row.time);
   const resEnd = new Date(resTime.getTime() - 5 * 60000);
