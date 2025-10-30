@@ -242,13 +242,13 @@ timeInput.addEventListener('blur', function () {
                 console.log('gap送信',timerValue)
                 socket.send(JSON.stringify({ action: 'increase', amount: message.amount}))
             }
+            }
+        
             document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
                 document.getElementById("is_reservation").value = this.checked ? "1" : "0";
                 inputWaitTime();
                 }
-            )}
-        
-        
+            )
     
 
     socket.onclose = function() {

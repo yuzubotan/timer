@@ -52,12 +52,14 @@
           <tr class="border">
              <td class="cel"><%= data[i].number %>本</td>
              <td class="cel"><%= data[i].number / 10 %>分</td>
-             <td colspan="2">開始時刻：<% if(data[i].reservation == 0) { %>
+             <td colspan="2">開始時刻：<% if(data[i].reservation == 0 ) { %>
               <%= new Date(new Date(data[i].time).getTime() - (data[i].number / 10 * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
-              <% } else { %>
+              <% } else if (data[i].reservation == 1) { %>
                 <%= new Date(new Date(data[i].time).getTime() - ((data[i].number / 10 + 5) * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
-              <% } %>
+              <% } else if (data[i].reservation == 2) { %>
+              <%= new Date(new Date(data[i].time).getTime() - (data[i].number / 10 * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
               </td>
+              <% } %>
              <td colspan="2"><%= data[i].checked %>:<%= data[i].reservation %></td>
              
           </tr>
