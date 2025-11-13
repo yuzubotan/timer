@@ -341,6 +341,7 @@ timeInput.addEventListener('blur', function () {
        socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60}))
                                     
        window.location="/checked?id=" + addTime<%- i %>.id;
+       return;
      }
     <% } %>
 }
