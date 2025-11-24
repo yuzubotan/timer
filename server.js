@@ -149,6 +149,7 @@ let gapPeriods = [];
 let newGap;
 let resStartList = [];
 let newGapMs;
+let deletedOrderedMs = 0;
 
 function calculateTimes(order, reservations) {
   const prepDurationMs = (order.number / 10) * 60000;
@@ -156,7 +157,7 @@ function calculateTimes(order, reservations) {
   console.log('newGap:', newGap);
   if (order.reservation === 1) {
     // 予約注文
-    const resTime = new Date(order.time);       // ユーザー指定の予約時刻
+    const resTime = new Date(new Date(order.time) - deletedOrderedMs);       // ユーザー指定の予約時刻
     const endTime = new Date(resTime.getTime() - 5 * 60000); // 完成は予約の5分前
     const startTime = new Date(endTime.getTime() - prepDurationMs);
     return { startTime, endTime, saveTime: resTime, gapMs: 0, }; // DBには予約時刻を保存
@@ -281,10 +282,29 @@ console.log('newGapMs:', newGapMs);
   }
 }
 
+function calculateGapTime(gapMs, newGapMs, wss) {
+  
+      console.log('gapMs:',gapMs/1000/60)
+      console.log('previousGapMs:', previousGapMs/1000/60)
+      if (gapMs > previousGapMs && wss) {
+        console.log('gapMs:',gapMs/1000/60)
+        const message = JSON.stringify({ type: 'gap', amount: Math.floor(newGapMs / 1000)});
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+              client.send(message);
+          }
+        
+        
+      });
 
+
+      }
+      previousGapMs = gapMs;
+}
 
 
   app.post('/submit', (req, res) => {
+    deletedOrderedMs = 0;
     const { time, number, reservation } = req.body;
     const orderedtime = new Date();
     console.log('previousGapMs:', previousGapMs/1000/60)
@@ -305,25 +325,10 @@ console.log('newGapMs:', newGapMs);
   
       const { saveTime, gapMs, newGapMs } = calculateTimes(order, reservations);
       
-
       const wss = req.app.locals.wss;
-      console.log('gapMs:',gapMs/1000/60)
-      console.log('previousGapMs:', previousGapMs/1000/60)
-      if (gapMs > previousGapMs && wss) {
-        console.log('gapMs:',gapMs/1000/60)
-        const message = JSON.stringify({ type: 'gap', amount: Math.floor(newGapMs / 1000)});
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-              client.send(message);
-          }
-        
-        
-      });
+      calculateGapTime(gapMs, newGapMs, wss);
 
-
-      }
-
-      previousGapMs = gapMs;
+      
       
       const sqlInsert = `
         INSERT INTO form_data (time, orderedtime, number, reservation)
@@ -401,7 +406,7 @@ app.get('/timeline/del', (req, res) => {
               console.error('削除エラー:', err.message);
               return res.status(500).send('削除中にエラーが発生しました');
           }
-
+        
           // 削除後に再計算
           const sqlAll = `SELECT * FROM form_data ORDER BY time ASC`;
           db.all(sqlAll, [], (err, rows) => {
@@ -409,59 +414,35 @@ app.get('/timeline/del', (req, res) => {
                   console.error('再計算用データ取得エラー:', err.message);
                   return res.status(500).send('再計算用データ取得中にエラーが発生しました');
               }
-
+              const deletedOrdered = new Date(deletedRow.time).toISOString();
+              deletedOrderedMs = deletedRow.number / 10 * 60 * 1000;
+       
+              console.log(deletedOrderedMs)
+              console.log(deletedOrdered)
+              console.log(rows);
               // 予約だけ抽出
-              const reservations = rows.filter(r => r.reservation === 1).map(r => {
-                  const reserveTime = new Date(r.time); // 予約時刻
-                  const cookMs = (r.number / 10) * 60000;
-                  const readyTime = new Date(reserveTime.getTime() - 5 * 60000);
-                  const startTime = new Date(readyTime.getTime() - cookMs);
-                  return { id: r.id, startTime, readyTime, reserveTime, cookMs };
-              });
+              const reservations = rows.filter((reservation) => {
+                return reservation.time > deletedOrdered
+              })
+              console.log('reservations:',reservations);
 
-              // 非予約を削除対象の orderedtime より後ろだけ調整
-              const deletedOrdered = new Date(deletedRow.orderedtime);
-              let updatedRows = [];
-
-              let timeline = []; // 調整後タイムライン
-
-              for (const row of rows) {
-                  const cookMs = (row.number / 10) * 60000;
-
-                  if (row.reservation === 1) {
-                      // 予約はそのまま
-                      timeline.push({
-                          ...row,
-                          completion: new Date(new Date(row.time).getTime() - 5 * 60000)
-                      });
-                      continue;
-                  }
-
-                  // 非予約
-                  const ordered = new Date(row.orderedtime);
-                  let completion = new Date(row.time); // 保存されている完了時刻
-                  let start = new Date(completion.getTime() - cookMs);
-
-                  // 削除対象より後だけ再調整
-                  if (ordered > deletedOrdered) {
-                      for (const resv of reservations) {
-                          const overlap = start < resv.readyTime && completion > resv.startTime;
-                          if (overlap) {
-                              // 予約の直後に開始
-                              start = new Date(resv.readyTime);
-                              completion = new Date(start.getTime() + cookMs);
-                          }
-                      }
-                  }
-
-                  timeline.push({ ...row, completion, start });
-                  updatedRows.push({ id: row.id, completion });
-              }
+              const order = {
+                id: rows.id,
+                time: rows.time,
+                number: rows.number,
+                reservation: rows.reservation
+              };
+        
+              
+              const { saveTime, gapMs, newGapMs } = calculateTimes(order, reservations);
+              console.log(saveTime)
+              const wss = req.app.locals.wss;
+              calculateGapTime(gapMs, newGapMs, wss);
 
               // DBを更新
               const sqlUpdate = `UPDATE form_data SET time = ? WHERE id = ?`;
               updatedRows.forEach(u => {
-                  db.run(sqlUpdate, [u.completion.toISOString(), u.id], (err) => {
+                  db.run(sqlUpdate, [saveTime.toISOString(), rows.id], (err) => {
                       if (err) {
                           console.error('再計算更新エラー:', err.message);
                       }
