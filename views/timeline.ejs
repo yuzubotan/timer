@@ -169,20 +169,55 @@
       const socket = new WebSocket('ws://localhost:3001');
 
       socket.onmessage = function(event) {
-        const message = JSON.parse(event.data)
-        if(message.type === "update") {
-          let timerValue = message.timerValue;
-          let hours = Math.floor(timerValue / 3600);
-          let minutes = Math.floor((timerValue % 3600) / 60);
-          let seconds = timerValue % 60;
 
-          document.getElementById('wait_time').textContent = `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
+    console.log("WS received:", event.data);
 
-        if(message.type === 'del') {
-          socket.send(JSON.stringify({ action: 'increase', amount: message.amount }));
-        }
-      }
+    // JSON に変換
+    const message = JSON.parse(event.data);
+
+    if(message.type === "update") { 
+      timerValue = message.timerValue; 
+      let hours = Math.floor(timerValue / 3600); 
+      let minutes = Math.floor((timerValue % 3600) / 60); 
+      let seconds = timerValue % 60; 
+      document.getElementById('wait_time').textContent = 
+      `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`; }
+
+    // --- デバッグログ ---
+    console.log("action:", message.action);
+    console.log("message.action === 'modify' ?", message.action === 'modify');
+    console.log("message.action === 'del' ?", message.action === 'del');
+
+    // --- modify の処理 ---
+    console.log(message.action)
+    if (message.type === 'modify') {
+        console.log('modify 受信 → 加算実行', timerValue);
+
+        timerValue += message.amount;
+
+        socket.send(
+            JSON.stringify({
+                action: 'increase',
+                amount: message.amount
+            })
+        );
+    }
+
+
+    // --- del の処理 ---
+    if (message.action === 'del') {
+        console.log('del 受信 → 加算実行', timerValue);
+
+        socket.send(
+            JSON.stringify({
+                action: 'increase',
+                amount: message.amount
+            })
+        );
+    }
+};
+
+
             // タイムラインコンテナ
 const timeline = document.querySelector('.timeline');
 const timeline2 = document.querySelector('.timeline2');

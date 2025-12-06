@@ -240,8 +240,11 @@ timeInput.addEventListener('blur', function () {
 
             if (message.type === 'gap') {
                 console.log('gap送信',timerValue)
+            
                 socket.send(JSON.stringify({ action: 'increase', amount: message.amount}))
             }
+
+            
             }
         
             document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
