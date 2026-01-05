@@ -92,6 +92,8 @@ app.get('/next-id', (req, res) => {
 app.get('/timeline', (req, res) => {
   const sql = "SELECT * FROM form_data ORDER BY time ASC";
   db.all(sql, [], (err, rows) => {
+    console.log(
+      rows.map(r => ({ id: r.id, done: r.done })))
       if (err) {
           console.log('Database query error:', err.message);
           return res.status(500).send('Database query error');
@@ -210,230 +212,115 @@ for (const row of reservations) {
         console.log(gapPeriods);
     }
     
-    if(prepDurationMs < newGapMs) {
-      newGap = gapPeriods.find(gapPeriod => 
-            gapPeriod.gap > prepDurationMs
-          )
-        
-    
-    
-console.log('newGapMs:', newGapMs);
-
-  
-      
-    let gapPeriodIndex = gapPeriods.findIndex(gapPeriod =>
-          gapPeriod.gap > prepDurationMs
-        )
-    if(gapPeriodIndex >= 0) {
-        console.log('gapPeriodIndex:', gapPeriodIndex);
-        console.log('resStartList:',resStartList[gapPeriodIndex]);
-        startTime = new Date(new Date(resStartList[gapPeriodIndex]).getTime() - newGap.gap); 
-        endTime = new Date(startTime.getTime() + prepDurationMs); 
-    
-          console.log(newGap)
-    if(prepDurationMs <= newGap.gap) {     
-        if (startTime <= now) {
-          
-          console.log('newGap:', newGap);
-          console.log('gap1:', gapMs/1000/60);
-          
-          console.log('gapMs:', gapMs/1000/60);
-      
-          startTime = new Date(resStart.getTime() - newGap.gap); 
-          endTime = new Date(startTime.getTime() + prepDurationMs); 
-        
-          console.log('resTime:', resTime)
-          console.log('startTime:', startTime)
-          console.log('resStart:', resStart);
-          console.log('endTime:', endTime);
-
-
-        
-        }
-          
-          if (startTime < resEnd && endTime > resStart) { 
-      
-            startTime = new Date(now.getTime() + timerValue * 1000); 
-            endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
-            order.reservation = 0;
-          console.log('gap3:', gapMs/1000/60);
-    
-          } else { 
-            order.reservation = 2; 
-            newGap.gap = newGap.gap - prepDurationMs;
-            if(newGap.gap < 0) {
-              newGap.gap = 0;
-            }
-            gapMs = gapMs - prepDurationMs;
-            console.log('newGap.gap:', newGap.gap);
-            console.log('gapMs4', gapMs);
-          } // gap に収まらない → gap 分ずらして保存 
-         
-        }
-        
-        
-    
-    
-      
-    break;
-    
-      }  
+   
 }
+return { startTime, endTime, saveTime: endTime, gapMs, newGapMs }; // DBには完了時刻を保存
 }
-    return { startTime, endTime, saveTime: endTime, gapMs, newGapMs }; // DBには完了時刻を保存
+    
   }
-}
+
+
 let lastEndTime = null;
+
 function updateTimes(order, reservations, context) {
-  console.log(context)
-  
-  const { deletedOrderedMs, now, timerValue, resStartList, gapPeriods } = context;
+  const {
+    baseTime,
+    deletedOrderedMs = 0,
+    now = new Date(),
+    timerValue = 0,
+    resStartList = [],
+    gapPeriods = [],
+    deletedRow = new Date()
+  } = context;
+  console.log('baseTime:',baseTime)
+  console.log('deletedOrderedMs:',deletedOrderedMs)
+  console.log('timerValue:', timerValue)
+  console.log('resStartList:',resStartList)
+  console.log('gapPeriods:',gapPeriods)
+  console.log('deletedRow:',deletedRow)
   const prepDurationMs = (order.number / 10) * 60000;
-  
-  console.log('newGap:', newGap);
+
+  /** -------------------------
+   * 予約注文
+   * ------------------------- */
   if (order.reservation === 1) {
-    // 予約注文
-    const resTime = new Date(new Date(order.time));       // ユーザー指定の予約時刻
-    const endTime = new Date(resTime.getTime() - 5 * 60000); // 完成は予約の5分前
+    const resTime = new Date(order.time);
+    const endTime = new Date(resTime.getTime() - 5 * 60000);
     const startTime = new Date(endTime.getTime() - prepDurationMs);
-    return { startTime, endTime, saveTime: resTime, gapMs: 0, }; // DBには予約時刻を保存
+
+    
+    return { startTime, endTime, saveTime: resTime, gapMs: 0 };
+  }
+
+  /** -------------------------
+   * 非予約注文
+   * ------------------------- */
+
+  let startTime;
+  
+
+  if (lastEndTime) {
+    startTime = new Date(lastEndTime);
   } else {
-    // 非予約注文
-    
-    let endTime = new Date(new Date(order.time).getTime() - deletedOrderedMs);
-    
-    if(lastEndTime !== null) {
-    // Math.max に number（ミリ秒）を渡す
-      
-      
-
-// number → Date に戻す
-      endTime = new Date(new Date(lastEndTime).getTime() + prepDurationMs);
-      console.log('ennndTime:', endTime)
-    }
-
-    let startTime = new Date(endTime.getTime() - prepDurationMs);
-
-for (const row of reservations) {
-  const resTime = new Date(row.time);
-  const resEnd = new Date(resTime.getTime() - 5 * 60000);
-  const resPrepMs = (row.number / 10) * 60000;
-  const resStart = new Date(resEnd.getTime() - resPrepMs);
-  const resStartStr = resStart.toISOString();
-  if(!resStartList.includes(resStartStr)) {
-    resStartList.push(resStartStr);
+    startTime = new Date(context.baseTime);
   }
-  console.log(resStartList);
-  const overlap = startTime < resEnd && endTime > resStart;
-  
-  if (overlap) { 
-    
-    if (startTime < now) { 
-      newGapMs = Math.max(0, resStart - now);
-      console.log('gapMs:', gapMs)
-      console.log('ovelap:', gapMs) // 実際の残り時間 
-    
-    } else { 
-      console.log('startTime:',startTime)
-      newGapMs = Math.max(0, resStart - startTime);
 
-      console.log('ovelap2:', gapMs) // 予定上の gap }
-} 
-      gapMs += newGapMs;
-      console.log('GapMs:', gapMs);
-        
-        gapPeriods.push({
-          gap: newGapMs,
-          start: new Date(resStart.getTime() - newGapMs),
-          endTime: resStart
-        });
+  let endTime = new Date(startTime.getTime() + prepDurationMs);
+  console.log('update:startTime', startTime)
+  console.log('update:endTime:',endTime)
+  /** -------------------------
+   * 予約との重複回避（核心）
+   * ------------------------- */
+  let overlapFound;
 
-        startTime = new Date(resEnd); 
-        endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
-        console.log('gapp:', gapMs);
-        
-        console.log('pregap:', previousGapMs);
-        
-        console.log(gapPeriods);
+  do {
+    overlapFound = false;
+
+    for (const row of reservations) {
+      const resTime = new Date(row.time);
+      const resEnd = new Date(resTime.getTime() - 5 * 60000);
+      const resPrepMs = (row.number / 10) * 60000;
+      const resStart = new Date(resEnd.getTime() - resPrepMs);
+
+      // ログ用
+      const resStartStr = resStart.toISOString();
+      if (!resStartList.includes(resStartStr)) {
+        resStartList.push(resStartStr);
+      }
+
+      const overlap = startTime < resEnd && endTime > resStart;
+
+      if (overlap) {
+        // 予約に当たったら予約の直後へ
+        startTime = new Date(resEnd);
+        endTime = new Date(startTime.getTime() + prepDurationMs);
+
+        overlapFound = true;
+        break; // ← 時間が変わったので最初から再チェック
+      }
     }
-    
-    if(prepDurationMs < newGapMs) {
-      newGap = gapPeriods.find(gapPeriod => 
-            gapPeriod.gap > prepDurationMs
-          )
-        
-    
-    
-console.log('newGapMs:', newGapMs);
 
+  } while (overlapFound);
+
+  /** -------------------------
+   * 確定
+   * ------------------------- */
   
-      
-    let gapPeriodIndex = gapPeriods.findIndex(gapPeriod =>
-          gapPeriod.gap > prepDurationMs
-        )
-    if(gapPeriodIndex >= 0) {
-        console.log('gapPeriodIndex:', gapPeriodIndex);
-        console.log('resStartList:',resStartList[gapPeriodIndex]);
-        startTime = new Date(new Date(resStartList[gapPeriodIndex]).getTime() - newGap.gap); 
-        endTime = new Date(startTime.getTime() + prepDurationMs); 
-    
-          console.log(newGap)
-    if(prepDurationMs <= newGap.gap) {     
-        if (startTime <= now) {
-          
-          console.log('newGap:', newGap);
-          console.log('gap1:', gapMs/1000/60);
-          
-          console.log('gapMs:', gapMs/1000/60);
-      
-          startTime = new Date(resStart.getTime() - newGap.gap); 
-          endTime = new Date(startTime.getTime() + prepDurationMs); 
-        
-          console.log('resTime:', resTime)
-          console.log('startTime:', startTime)
-          console.log('resStart:', resStart);
-          console.log('endTime:', endTime);
-
-
-        
-        }
-          
-          if (startTime < resEnd && endTime > resStart) { 
-      
-            startTime = new Date(now.getTime() + timerValue * 1000); 
-            endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
-            order.reservation = 0;
-          console.log('gap3:', gapMs/1000/60);
-    
-          } else { 
-            order.reservation = 2; 
-            newGap.gap = newGap.gap - prepDurationMs;
-            if(newGap.gap < 0) {
-              newGap.gap = 0;
-            }
-            gapMs = gapMs - prepDurationMs;
-            console.log('newGap.gap:', newGap.gap);
-            console.log('gapMs4', gapMs);
-          } // gap に収まらない → gap 分ずらして保存 
-         
-        }
-        
-        
-    
-     
-      
-    break;
-    
-      }  
-      
-}
-    
-}
+  
     lastEndTime = endTime;
-    console.log('lastEndTime:',lastEndTime)
-    return { startTime, endTime, saveTime: endTime, gapMs, newGapMs }; // DBには完了時刻を保存
-  }
+  
+  console.log('lastEndTime:', toDatetimeLocalString(lastEndTime))
+  console.log('lastEndTime:', lastEndTime)
+  return {
+    startTime,
+    endTime,
+    saveTime: endTime,
+    gapMs: 0,
+  };
 }
+
+    
+  
 
 function calculateGapTime(gapMs, newGapMs, wss) {
   
@@ -549,6 +436,8 @@ app.get("/order", (req,res) => {
   const results = [];
 
   for (const order of orders) {
+    
+                  
     const info = updateTimes(order, reservations, context);
 
     
@@ -590,57 +479,134 @@ app.get('/timeline/del', (req, res) => {
               console.error('削除エラー:', err.message);
               return res.status(500).send('削除中にエラーが発生しました');
           }
+          
+
         
           // 削除後に再計算
-          const sqlAll = `SELECT * FROM form_data where time > ? ORDER BY id ASC`;
+          const sqlAll = `SELECT * FROM form_data where time >= ? ORDER BY time ASC`;
         
           db.all(sqlAll, [deletedRow.time], (err, rows) => {
               if (err) {
                   console.error('再計算用データ取得エラー:', err.message);
                   return res.status(500).send('再計算用データ取得中にエラーが発生しました');
               }
+
+              rows.map(row => {
+                    console.log('rows:',rows)
+                    const prepDurationMs = row.number / 10 * 60 * 1000;
+                    if(row.reservation == 0) {
+                      let startTime = new Date(new Date(row.time).getTime() - prepDurationMs)
+                      row.startTime = startTime;
+                      
+                    } else {
+                      let startTime = new Date(new Date(row.time).getTime() - prepDurationMs - 5 * 60 * 1000)
+                      row.startTime = startTime;
+                    }
+                    
+                  })
+                  rows.sort((a, b) => a.startTime - b.startTime);
+                  console.log('map:rows:',rows)
+
+              let targetTime = deletedRow.time;
+              console.log('target1:',targetTime)
+              console.log(typeof targetTime)
+              if(deletedRow.reservation == 1) {
+                targetTime = new Date(new Date(deletedRow.time).getTime() - 5 * 60 * 1000).toISOString();
+                console.log('target2:',targetTime);
+                console.log(typeof targetTime);
+              }
               
-              const reservations = rows.filter(o => o.reservation === 1);
-           
-              const context = {
-                now: new Date(),
-                timerValue,
-                deletedOrderedMs: deletedRow.number / 10 * 60 * 1000,
-                resStartList: [],
-                gapPeriods: gapPeriods,
-                gapMs: gapMs,
-                newGapMs: newGapMs
-              };
+              db.get("SELECT * FROM form_data WHERE time < ? ORDER BY time DESC LIMIT 1",
+                [targetTime],(err, prevRow) => {
+                  console.log('prevRow:',prevRow)
+                // prevRow が null の場合もある
+                  
+                  let baseTime;
 
-              const wss = req.app.locals.wss;
-              const now = new Date();
-              if(context.deletedOrderedMs !== 0) {
-                console.log('dtime:', deletedRow.time)
-                console.log('d:', (new Date(deletedRow.time) - now) / 1000)
-                const message = JSON.stringify({type: 'modify', amount: - context.deletedOrderedMs / 1000, });
-                wss.clients.forEach((client) => {
-                  if(client.readyState === WebSocket.OPEN) {
-                    client.send(message);
+                  if (prevRow) {
+                    console.log('prevRowはある')
+                    if (prevRow.reservation === 1) {
+                      // 予約は time が「予約時刻」なので endTime を計算
+                      const resTime = new Date(prevRow.time);
+                      const end = new Date(resTime.getTime() - 5 * 60000);
+                      const prepMs = (prevRow.number / 10) * 60000;
+                      baseTime = new Date(end.getTime()); // ← 完成時刻
+                      console.log('prevRowはあるres1:',baseTime)
+                    } else {
+                      // 非予約は time = 完了時刻
+                      baseTime = new Date(prevRow.time);
+                       console.log('prevRowはあるres0:',baseTime)
+                    }
+                  } else {
+                    console.log('prevRowはない')
+                    baseTime = new Date(); // 先頭を消した場合
                   }
-                })
-              }
-              console.log('context.deletedOrderedMs:', context.deletedOrderedMs)
-        // 5. まとめて再計算！
-              const results = recalcAfterDelete(rows, reservations, context);
+                  console.log('baseTime結果:', baseTime)
+                  const reservations = rows.filter(o => o.reservation === 1);
+           
+                  const context = {
+                    baseTime,
+                    now: new Date(),
+                    timerValue,
+                    deletedOrderedMs: deletedRow.number / 10 * 60 * 1000,
+                    resStartList: resStartList,
+                    deletedRow: deletedRow,
+                    gapPeriods: gapPeriods,
+                    gapMs: gapMs,
+                    newGapMs: newGapMs
+                  };
+                  console.log('timeline/del:context:',context)
+                  const wss = req.app.locals.wss;
 
-        // 6. DBに保存
-              for (const item of results) {
-                db.run("UPDATE form_data SET time = ? WHERE id = ?", [
-                  item.saveTime.toISOString(),
-                  item.id
-                ]);
-              }
+                  const totalReduceMs =
+                    (context.deletedOrderedMs || 0) +
+                    (context.gapMs || 0);
+
+                  if (totalReduceMs > 0) {
+                    const message = JSON.stringify({
+                      type: 'modify',
+                      amount: -totalReduceMs / 1000
+                    });
+
+                    wss.clients.forEach(client => {
+                      if (client.readyState === WebSocket.OPEN) {
+                        client.send(message);
+                      }
+                    });
+
+                    console.log('timerValue total reduce:', -totalReduceMs / 1000);
+                    gapMs = 0;
+                  }
+
+                  
+                  
+                  console.log('context.deletedOrderedMs:', context.deletedOrderedMs)
+            // 5. まとめて再計算！
+                  const results = recalcAfterDelete(rows, reservations, context);
+                  console.log('results:', results)
+            // 6. DBに保存
+                  for (const item of results) {
+                    if (!(item.saveTime instanceof Date)) {
+                      console.error('invalid saveTime:', item);
+                      continue;
+                    }
+                    db.run("UPDATE form_data SET time = ? WHERE id = ?", [
+                      item.saveTime.toISOString(),
+                      item.id
+                    ]);
+                  }
 
               
               
              
 
-              res.redirect('/timeline');
+                  res.redirect('/timeline');
+  
+              }
+);
+
+              
+              
           });
       });
   });
@@ -732,6 +698,8 @@ function toDatetimeLocalString(utcString) {
 }
 
   app.get("/timeline/modify", (req, res) => {
+    console.log('modify called, id=', req.query.id);
+    lastEndTime = null;
     let id = req.query.id;
     let sql = "select * from form_data where id = ?";
     db.get(sql, [id], (err, finishedOrder) => {
@@ -739,6 +707,16 @@ function toDatetimeLocalString(utcString) {
         console.error('修正データの取得に失敗しました', err)
       }
         console.log(finishedOrder.time.toLocaleString())
+
+      db.run(
+        "UPDATE form_data SET done = 1 WHERE id = ?",
+        [id],
+        err => {
+          if (err) {
+            console.error('done更新失敗', err);
+            return res.sendStatus(500);
+          }
+
       db.all("select * from form_data where time > ? order by time asc",
         [finishedOrder.time],
         (err, subsequentOrders) => {
@@ -747,13 +725,108 @@ function toDatetimeLocalString(utcString) {
             return res.status(500).send('後続注文取得に失敗しました。');
         }
         console.log(subsequentOrders)
-        const wss = req.app.locals.wss;
- 
+
+            subsequentOrders.map(row => {
+                    const prepDurationMs = row.number / 10 * 60 * 1000;
+                    if(row.reservation == 0) {
+                      let startTime = new Date(new Date(row.time).getTime() - prepDurationMs)
+                      row.startTime = startTime;
+                      
+                    } else {
+                      let startTime = new Date(new Date(row.time).getTime() - prepDurationMs - 5 * 60 * 1000)
+                      row.startTime = startTime;
+                    }
+                    
+                  })
+            subsequentOrders.sort((a, b) => a.startTime - b.startTime);
+            let targetTime = finishedOrder.time;
+              console.log('target1:',targetTime)
+              if(finishedOrder.reservation == 1) {
+                targetTime = new Date(new Date(finishedOrder.time).getTime() - 5 * 60 * 1000).toISOString();
+                console.log('target2:',targetTime);
+              }
+              
+              db.get("SELECT * FROM form_data WHERE time < ? ORDER BY time DESC LIMIT 1",
+                [targetTime],(err, prevRow) => {
+                  console.log('prevRow:',prevRow)
+                // prevRow が null の場合もある
+                  
+                  let baseTime;
+
+                  if (prevRow) {
+                    console.log('prevRowはある')
+                    if (prevRow.reservation === 1) {
+                      // 予約は time が「予約時刻」なので endTime を計算
+                      const resTime = new Date(prevRow.time);
+                      const end = new Date(resTime.getTime() - 5 * 60000);
+                      const prepMs = (prevRow.number / 10) * 60000;
+                      baseTime = new Date(end.getTime()); // ← 完成時刻
+                      console.log('prevRowはあるres1:',baseTime)
+                    } else {
+                      // 非予約は time = 完了時刻
+                      baseTime = new Date(prevRow.time);
+                       console.log('prevRowはあるres0:',baseTime)
+                    }
+                  } else {
+                    console.log('prevRowはない')
+                    baseTime = new Date(); // 先頭を消した場合
+                  }
+                  console.log('baseTime結果:', baseTime)
+                  
+            const reservations = subsequentOrders.filter(o => o.reservation === 1);
+
+            const context = {
+                    baseTime,
+                    now: new Date(),
+                    timerValue,
+                    deletedOrderedMs: finishedOrder.number / 10 * 60 * 1000,
+                    resStartList: resStartList,
+                    deletedRow: finishedOrder,
+                    gapPeriods: gapPeriods,
+                    gapMs: gapMs,
+                    newGapMs: newGapMs
+                  };
+
+            console.log('modifydeletedOrderedMs:',deletedOrderedMs)
+            const wss = req.app.locals.wss;
+            const totalReduceMs =
+                    (context.deletedOrderedMs || 0) +
+                    (context.gapMs || 0);
+
+                  if (totalReduceMs > 0) {
+                    const message = JSON.stringify({
+                      type: 'modify',
+                      amount: -totalReduceMs / 1000
+                    });
+
+                    wss.clients.forEach(client => {
+                      if (client.readyState === WebSocket.OPEN) {
+                        client.send(message);
+                      }
+                    });
+
+                    console.log('timerValue total reduce:', -totalReduceMs / 1000);
+                    gapMs = 0;
+                  }
+
+                  
+              console.log('context.deletedOrderedMs:', context.deletedOrderedMs)
+        // 5. まとめて再計算！
+              const results = recalcAfterDelete(subsequentOrders, reservations, context);
+
+        // 6. DBに保存
+              for (const item of results) {
+                db.run("UPDATE form_data SET time = ? WHERE id = ?", [
+                  item.saveTime.toISOString(),
+                  item.id
+                ]);
+              }
   
-        modifyOrders(subsequentOrders, finishedOrder, wss, () => {
+            })
         
-          res.redirect('/timeline');
-        });      
+          res.json({ success: true });
+
+          })
         }
       )
     })

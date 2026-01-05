@@ -125,6 +125,25 @@
         margin-right: 5px;
       }
 
+
+      .data-item {
+        transition: opacity 0.2s;
+      }
+
+      .data-item.processing {
+        opacity: 0.5;
+      }
+
+      .data-item.done {
+        opacity: 0.3;
+      }
+
+      .data-item.processing .ok,
+      .data-item.done .ok {
+        pointer-events: none;
+        opacity: 0.5;
+      }
+
         
     </style>
 </head>
@@ -148,7 +167,7 @@
             %>
             
             <% if(itemTop >= 0) { %>
-              <div class="data-item" style="top: <%= itemTop %>px">
+              <div class="data-item <%= item.done == 1 ? 'done' : '' %>" style="top: <%= itemTop %>px">
                 <span class="point">●</span><span class="id"><%= item.id %></span>
                 <button class="bt" onclick="javascript:del(<%= item.id %>, <%= item.number %>)">DEL</button>
                 <span class="order" style="<%= item.reservation === 1 ? 'background-color: lightblue;' : '' %>">
@@ -157,7 +176,11 @@
                     <br>予約:<%= item.reserveTime %>
                   <% } %>
                 </span>
-                <button class="bt" id="ok" onclick="javascript:modify(<%= item.id %>,<%= item.number %>)">OK</button>
+                <button class="bt ok"
+                  <%= item.done == 1 ? 'disabled' : '' %>
+                  <%- item.done == 1 ? '' : 'onclick="modify(this, ' + item.id + ', ' + item.number + ')"' %>>OK</button>
+
+
               </div>
             <% } %>
           <% } %>
@@ -218,6 +241,51 @@
 };
 
 
+async function modify(button, id, number) {
+
+  console.log('modify called, id=', id); // ← 必ず出る
+  if (button.dataset.locked === '1') {
+    return;
+  }
+  button.dataset.locked = '1';
+
+  if (!window.confirm('id=' + id + 'が出来上がりましたか？')) {
+    button.dataset.locked = '';
+
+    return;
+  }
+
+  // 二度押し防止
+  button.disabled = true;
+
+  const dataItem = button.closest('.data-item');
+  dataItem.classList.add('processing');
+
+  try {
+    const response = await fetch(`/timeline/modify?id=${id}`, {
+      method: 'GET'
+    });
+
+    if (!response.ok) throw new Error('server error');
+
+    // 成功
+    dataItem.classList.remove('processing');
+    dataItem.classList.add('done');
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 200);
+
+  } catch (e) {
+    // 失敗時は元に戻す
+    alert('通信に失敗しました');
+    dataItem.classList.remove('processing');
+    button.disabled = false;
+    button.dataset.locked = '';
+  }
+}
+
+
             // タイムラインコンテナ
 const timeline = document.querySelector('.timeline');
 const timeline2 = document.querySelector('.timeline2');
@@ -275,15 +343,6 @@ function del(id, number) {
           }
         }
 
-function modify(id, number) {
-  
-  let result = window.confirm('id=' + id + 'が出来上がりましたか？');
-  if(result) {
-    
-    window.location = "/timeline/modify?id=" + id;
-  }
-  document.getElementById('ok').style.opacity = 0.2;
-}
 
     </script>
 </body>
