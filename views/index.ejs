@@ -313,6 +313,7 @@ timeInput.addEventListener('blur', function () {
             number: <%= data[i].number / 10 %>, 
             checked: <%= data[i].checked %>, 
             reservation: <%= data[i].reservation %>, 
+            absorbed: <%= data[i].absorbed %>,
             time: new Date('<%= data[i].time %>')
         };
         let timeToStart<%- i %> = new Date(addTime<%- i %>.time.getTime() - needMinutes<%- i %> * 60 * 1000);
@@ -340,8 +341,12 @@ timeInput.addEventListener('blur', function () {
             
         }
         if (wait_minutes > timeToStart<%- i %> && addTime<%- i %>.checked === 0 && addTime<%- i %>.reservation === 1) {
-       
-       socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60}))
+            let amount = addTime<%- i %>.number * 60;
+            if(addTime<%- i %>.absorbed == 1) {
+                
+                amount -= addTime<%- i %>.number * 60
+            }
+       socket.send(JSON.stringify({ action: 'increase', amount: amount}))
                                     
        window.location="/checked?id=" + addTime<%- i %>.id;
        return;

@@ -174,6 +174,12 @@
                   開始:<%= item.startTime %> 本数:<%= item.number %>
                   <% if(item.reservation === 1) { %>
                     <br>予約:<%= item.reserveTime %>
+                    <% if (item.merged_from) { %>
+                      <div class="merged-info">
+                        （ID: <%= item.merged_from %>）
+                      </div>
+                    <% } %>
+
                   <% } %>
                 </span>
                 <button class="bt ok"

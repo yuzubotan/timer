@@ -94,8 +94,7 @@ app.get('/next-id', (req, res) => {
 app.get('/timeline', (req, res) => {
   const sql = "SELECT * FROM form_data WHERE done = 0 ORDER BY time ASC";
   db.all(sql, [], (err, rows) => {
-    console.log(
-      rows.map(r => ({ id: r.id, done: r.done })))
+    
       if (err) {
           console.log('Database query error:', err.message);
           return res.status(500).send('Database query error');
@@ -118,11 +117,18 @@ app.get('/timeline', (req, res) => {
               completionTime = new Date(Date.parse(row.time)); // DBに保存された完了時刻
               startTime = new Date(completionTime.getTime() - prepDurationMs); // 開始時刻
           }
+console.log(
+  rows.map(r => ({
+    id: r.id,
+    merged_from: r.merged_from
+  }))
+);
 
           return {
               id: row.id,
               number: row.number,
               reservation: row.reservation,
+              merged_from: row.merged_from,
               reserveTime: reserveTime ? reserveTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}) : null,
               completionTime: completionTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}),
               startTime: startTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}),
@@ -335,62 +341,226 @@ function calculateGapTime(gapMs, newGapMs, wss) {
       previousGapMs = gapMs;
 }
 
+  function getReservationWindow(time, number) {
+    const t = (time instanceof Date) ? time : new Date(time);
+    const prepMs = number / 10 * 60 * 1000;
+    const endAt = new Date(t.getTime() - 5 * 60 * 1000);
+    const startAt = new Date(endAt.getTime() - prepMs);
+    return { startAt, endAt };
+  }
+
+  function isOverlapping(a, b) {
+    return a.startAt < b.endAt && b.startAt < a.endAt;
+  }
+
+  function mergeReservationChain(newOrder, existingRows) {
+  let merged = {
+    time: newOrder.time,
+    number: 0
+  };
+
+  let absorbedIds = [];
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    const mergedWindow = getReservationWindow(
+      merged.time,
+      merged.number || newOrder.number
+    );
+
+    for (const row of existingRows) {
+      if (absorbedIds.includes(row.id)) continue;
+
+      const rowWindow = getReservationWindow(
+        row.time,
+        row.number
+      );
+
+      if (isOverlapping(mergedWindow, rowWindow)) {
+        // 吸収
+        merged.number += row.number;
+        merged.time = new Date(
+          Math.min(
+            new Date(merged.time).getTime(),
+            new Date(row.time).getTime()
+          )
+        );
+
+        absorbedIds.push(row.id);
+        changed = true;
+      }
+    }
+  }
+
+  merged.number += newOrder.number;
+
+  return { merged, absorbedIds };
+}
+
 
   app.post('/submit', (req, res) => {
     deletedOrderedMs = 0;
     const { time, number, reservation } = req.body;
     const orderedtime = new Date();
-  
-    const sqlSelect = `SELECT time, number FROM form_data WHERE reservation = 1 ORDER BY time ASC`;
-  
-    db.all(sqlSelect, [], (err, reservations) => {
-      if (err) {
-        console.error("予約データ取得エラー:", err.message);
-        return res.status(500).send("予約データ取得中にエラーが発生しました。");
-      }
-  
-      const order = {
-        time,
+
+    const order = {
+        time: new Date(time),
         number: Number(number),
         reservation: Number(reservation)
       };
 
-      const context = {
-        deletedOrderedMs: 0,      // 削除再計算ではないため常に 0
-        now: new Date(),
-        timerValue,
-        resStartList: [],
-        gapPeriods: gapPeriods,
-        gapMs: 0
-      };
-  
-      const { saveTime, gapMs, newGapMs } = calculateTimes(order, reservations, context);
-      
-      const wss = req.app.locals.wss;
-      calculateGapTime(gapMs, newGapMs, wss);
 
-      
-      
-      const sqlInsert = `
-        INSERT INTO form_data (time, orderedtime, number, reservation)
-        VALUES (?, ?, ?, ?)
-      `;
-      
-      const values = [
-        saveTime.toISOString(),     // 予約なら予約時刻、非予約なら完了時刻
-        orderedtime.toISOString(),
-        order.number,
-        order.reservation
-      ];
   
-      db.run(sqlInsert, values, (err) => {
+    if(order.reservation == 0) {
+      const sqlSelect = `SELECT time, number FROM form_data WHERE reservation = 1 ORDER BY time ASC`;
+      db.all(sqlSelect, [], (err, reservations) => {
         if (err) {
-          console.error("データ保存エラー:", err.message);
-          return res.status(500).send("データ保存中にエラーが発生しました。");
+          console.error("予約データ取得エラー:", err.message);
+          return res.status(500).send("予約データ取得中にエラーが発生しました。");
         }
-        res.redirect("/");
+      
+        const context = {
+          deletedOrderedMs: 0,      // 削除再計算ではないため常に 0
+          now: new Date(),
+          timerValue,
+          resStartList: [],
+          gapPeriods: gapPeriods,
+          gapMs: 0
+        };
+        const { saveTime, gapMs, newGapMs } = calculateTimes(order, reservations, context);
+      console.log('newGap:', newGapMs)
+        const wss = req.app.locals.wss;
+        calculateGapTime(gapMs, newGapMs, wss);
+      
+      
+        const sqlInsert = `
+          INSERT INTO form_data (time, orderedtime, number, reservation)
+          VALUES (?, ?, ?, ?)
+        `;
+      
+        const values = [
+          saveTime.toISOString(),     // 予約なら予約時刻、非予約なら完了時刻
+          orderedtime.toISOString(),
+          order.number,
+          order.reservation
+        ];
+        db.run(sqlInsert, values, (err) => {
+          if (err) {
+            console.error("データ保存エラー:", err.message);
+            return res.status(500).send("データ保存中にエラーが発生しました。");
+          }
+          res.redirect("/");
+        });
       });
-    });
+      return;
+    }
+  
+    db.all(
+  `SELECT * FROM form_data
+   WHERE reservation = 1
+     AND done = 0
+     AND absorbed = 0
+   ORDER BY time ASC`,
+  [],
+  (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.sendStatus(500);
+    }
+
+    // ★① まず新規予約を INSERT（必ず）
+    db.run(
+      `INSERT INTO form_data (time, orderedtime, number, reservation)
+       VALUES (?, ?, ?, 1)`,
+      [
+        order.time.toISOString(),
+        orderedtime.toISOString(),
+        order.number
+      ],
+      function (err) {
+        if (err) {
+          console.error(err);
+          return res.sendStatus(500);
+        }
+
+        const newId = this.lastID;
+
+        // ★② 新規予約を rows に追加
+        const newRow = {
+          id: newId,
+          time: order.time,
+          number: order.number,
+          merged_from: null
+        };
+
+        const rowsWithNew = [...rows, newRow];
+
+        // ★③ マージ判定
+        const { merged, absorbedIds } =
+  mergeReservationChain(order, rows);
+
+// ★ 新規予約IDを吸収対象に追加
+absorbedIds.push(newId);
+
+if (absorbedIds.length > 0) {
+
+  const keepRow = rows
+    .filter(r => absorbedIds.includes(r.id))
+    .concat({ id: newId, time: order.time }) // newRowも考慮
+    .sort((a, b) => new Date(a.time) - new Date(b.time))[0];
+
+  const keepId = keepRow.id;
+
+  const prevMergedIds = keepRow.merged_from
+    ? keepRow.merged_from.split(',').map(Number)
+    : [];
+
+  const mergedIds = Array.from(
+    new Set([keepId, ...prevMergedIds, ...absorbedIds])
+  );
+
+  const mergedFromStr = mergedIds.join(',');
+
+  const absorbedOnlyIds =
+    absorbedIds.filter(id => id !== keepId);
+
+  db.serialize(() => {
+
+    db.run(
+      `UPDATE form_data
+       SET number = ?, time = ?, merged_from = ?, absorbed = 0
+       WHERE id = ?`,
+      [
+        merged.number,
+        merged.time.toISOString(),
+        mergedFromStr,
+        keepId
+      ]
+    );
+
+    if (absorbedOnlyIds.length > 0) {
+      db.run(
+        `UPDATE form_data
+         SET absorbed = 1, done = 1
+         WHERE id IN (${absorbedOnlyIds.map(() => '?').join(',')})`,
+        absorbedOnlyIds
+      );
+    }
+  });
+
+  return res.redirect('/');
+}
+
+
+        // 吸収がなければ INSERT 済みなのでそのまま
+        return res.redirect('/');
+      }
+    );
+  }
+);
+  
   });
   
 
@@ -718,9 +888,6 @@ function toDatetimeLocalString(utcString) {
 
           console.log('finishedOrder:',finishedOrder)
 
-          if(finishedOrder.reservation == 1) {
-            console.log(12)
-          }
 
         
           console.log('finishedOrder.Time:',finishedOrder.time)
@@ -785,6 +952,7 @@ function toDatetimeLocalString(utcString) {
                     deletedOrderedMs = new Date(finishedOrder.time).getTime() - new Date().getTime();
                     baseTime = new Date(); // 先頭を消した場合
                     console.log('prevrowなし:', deletedOrderedMs)
+                    
                   }
                   console.log('baseTime結果:', baseTime)
                   
