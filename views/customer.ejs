@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet">
+    <title>Document</title>
+    <style>
+        body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Fredoka', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: start;
+      height: 100vh;
+      background: #a8bafa;
+    }
+
+    
+      
+    .heading-box {
+      background-color: linear-gradient(to bottom right, #A4FEBB, #8cacff);
+      border: 5px solid lightblue;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px 0;
+      width: fit-content;
+      text-align: center;
+      box-shadow: 5px 8px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .heading-box h1 {
+      font-family:'Zen Maru Gothic', sans-serif; 
+      font-size: 4em;
+      color: white;
+      margin: 0;
+      text-shadow: 5px 5px 2px rgba(0,0,0,0.1);
+      
+    }
+
+    #timer {
+      font-size: 150px;
+      text-align: center;
+      border: 8px solid white;
+      background-color: #fff;
+      color: #4a4a4a;
+      border-radius: 30px;
+      box-shadow: 5px 8px 8px rgba(0, 0, 0, 0.5);
+      width: 100%;
+      max-width: 540px;
+      margin-top: 10px;
+      padding: 10px;
+      text-shadow: 5px 5px 2px rgba(0,0,0,0.1);
+    }
+
+    button {
+      margin-top: 60px;
+      font-size: 20px;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 25px;
+      background-color: #ffb703;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #fb8500;
+    }
+    </style>
+</head>
+<body>
+    <div class="heading-box">
+      <h1>現在の待ち時間 (推定)</h1>
+  </div>
+    <div id="timer"></div><br><br><br><br><br>
+    <button onclick="location.href='/'">TOP</button>
+ <script>
+    const socket = new WebSocket(
+  (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host
+);
+      let currentTimer = 0;
+  let intervalId = null;
+
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === 'update') {
+      currentTimer = message.timerValue;
+
+      // タイマーの更新間隔を一度だけセット
+      if (!intervalId) {
+        intervalId = setInterval(() => {
+          if (currentTimer > 0) {
+            currentTimer--;
+          }
+          updateTimerDisplay();
+        }, 1000);
+      }
+
+      updateTimerDisplay();
+    }
+  });
+
+  function updateTimerDisplay() {
+    const timerElement = document.getElementById('timer');
+    let hours = Math.floor(currentTimer / 3600);
+    let minutes = Math.floor((currentTimer % 3600) / 60);
+    let seconds = currentTimer % 60;
+
+    timerElement.textContent =
+      `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+ </script>
+</body>
+</html>
