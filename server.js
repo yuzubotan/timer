@@ -1,6 +1,6 @@
 
 const app = require('./index');
-const port = 3001;
+const PORT = process.env.PORT || 3001;
 const http = require('http');
 const db = require('./db');
 const WebSocket = require('ws');
@@ -12,8 +12,8 @@ app.locals.wss = wss;
 
 let reduceRemainderMs = 0;
 
-server.listen(port, () => {
-    console.log(`Server is running on ${port} `);
+server.listen(PORT, () => {
+    console.log(`Server is running on ${PORT} `);
 })
 
 let timerValue = 60; // 初期値（例）
@@ -117,12 +117,7 @@ app.get('/timeline', (req, res) => {
               completionTime = new Date(Date.parse(row.time)); // DBに保存された完了時刻
               startTime = new Date(completionTime.getTime() - prepDurationMs); // 開始時刻
           }
-console.log(
-  rows.map(r => ({
-    id: r.id,
-    merged_from: r.merged_from
-  }))
-);
+
 
           return {
               id: row.id,
@@ -152,14 +147,13 @@ console.log(
 let gapMs = 0;
 let previousGapMs = 0;
 let gapPeriods = [];
-let newGap;
 let resStartList = [];
 let newGapMs;
-let deletedOrderedMs = 0;
+
 
 function calculateTimes(order, reservations, context) {
   
-  const { deletedOrderedMs, now, timerValue, resStartList, gapPeriods } = context;
+  const { now, resStartList, gapPeriods } = context;
   const prepDurationMs = (order.number / 10) * 60000;
   
   if (order.reservation === 1) {
@@ -175,15 +169,15 @@ function calculateTimes(order, reservations, context) {
     
     let endTime = new Date(startTime.getTime() + prepDurationMs);
 
-for (const row of reservations) {
-  const resTime = new Date(row.time);
-  const resEnd = new Date(resTime.getTime() - 5 * 60000);
-  const resPrepMs = (row.number / 10) * 60000;
-  const resStart = new Date(resEnd.getTime() - resPrepMs);
-  const resStartStr = resStart.toISOString();
-  if(!resStartList.includes(resStartStr)) {
-    resStartList.push(resStartStr);
-  }
+  for (const row of reservations) {
+    const resTime = new Date(row.time);
+    const resEnd = new Date(resTime.getTime() - 5 * 60000);
+    const resPrepMs = (row.number / 10) * 60000;
+    const resStart = new Date(resEnd.getTime() - resPrepMs);
+    const resStartStr = resStart.toISOString();
+    if(!resStartList.includes(resStartStr)) {
+      resStartList.push(resStartStr);
+    }
   const overlap = startTime < resEnd && endTime > resStart;
   
   if (overlap) { 
@@ -458,17 +452,12 @@ function calculateGapTime(gapMs, newGapMs, wss) {
     }
   
     db.all(
-  `SELECT * FROM form_data
-   WHERE reservation = 1
-     AND done = 0
-     AND absorbed = 0
-   ORDER BY time ASC`,
-  [],
-  (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.sendStatus(500);
-    }
+      `SELECT * FROM form_data WHERE reservation = 1 AND done = 0 AND absorbed = 0 ORDER BY time ASC`,
+      [],(err, rows) => {
+      if (err) {
+        console.error(err);
+        return res.sendStatus(500);
+      }
 
     // ★① まず新規予約を INSERT（必ず）
     db.run(
@@ -498,60 +487,55 @@ function calculateGapTime(gapMs, newGapMs, wss) {
         const rowsWithNew = [...rows, newRow];
 
         // ★③ マージ判定
-        const { merged, absorbedIds } =
-  mergeReservationChain(order, rows);
+        const { merged, absorbedIds } = mergeReservationChain(order, rows);
 
-// ★ 新規予約IDを吸収対象に追加
-absorbedIds.push(newId);
+        // ★ 新規予約IDを吸収対象に追加
+        absorbedIds.push(newId);
 
-if (absorbedIds.length > 0) {
+        if (absorbedIds.length > 0) {
 
-  const keepRow = rows
-    .filter(r => absorbedIds.includes(r.id))
-    .concat({ id: newId, time: order.time }) // newRowも考慮
-    .sort((a, b) => new Date(a.time) - new Date(b.time))[0];
+          const keepRow = rows
+            .filter(r => absorbedIds.includes(r.id))
+            .concat({ id: newId, time: order.time }) // newRowも考慮
+            .sort((a, b) => new Date(a.time) - new Date(b.time))[0];
 
-  const keepId = keepRow.id;
+          const keepId = keepRow.id;
 
-  const prevMergedIds = keepRow.merged_from
-    ? keepRow.merged_from.split(',').map(Number)
-    : [];
+          const prevMergedIds = keepRow.merged_from
+            ? keepRow.merged_from.split(',').map(Number)
+            : [];
 
-  const mergedIds = Array.from(
-    new Set([keepId, ...prevMergedIds, ...absorbedIds])
-  );
+          const mergedIds = Array.from(
+            new Set([keepId, ...prevMergedIds, ...absorbedIds])
+          );
 
-  const mergedFromStr = mergedIds.join(',');
+          const mergedFromStr = mergedIds.join(',');
 
-  const absorbedOnlyIds =
-    absorbedIds.filter(id => id !== keepId);
+          const absorbedOnlyIds =
+            absorbedIds.filter(id => id !== keepId);
 
-  db.serialize(() => {
+          db.serialize(() => {
 
-    db.run(
-      `UPDATE form_data
-       SET number = ?, time = ?, merged_from = ?, absorbed = 0
-       WHERE id = ?`,
-      [
-        merged.number,
-        merged.time.toISOString(),
-        mergedFromStr,
-        keepId
-      ]
-    );
+            db.run(
+              `UPDATE form_data SET number = ?, time = ?, merged_from = ?, absorbed = 0 WHERE id = ?`,
+              [
+                merged.number,
+                merged.time.toISOString(),
+                mergedFromStr,
+                keepId
+              ]
+            );
 
-    if (absorbedOnlyIds.length > 0) {
-      db.run(
-        `UPDATE form_data
-         SET absorbed = 1, done = 1
-         WHERE id IN (${absorbedOnlyIds.map(() => '?').join(',')})`,
-        absorbedOnlyIds
-      );
-    }
-  });
+            if (absorbedOnlyIds.length > 0) {
+              db.run(
+                `UPDATE form_data SET absorbed = 1, done = 1 WHERE id IN (${absorbedOnlyIds.map(() => '?').join(',')})`,
+                absorbedOnlyIds
+              );
+            }
+          });
 
-  return res.redirect('/');
-}
+          return res.redirect('/');
+        }
 
 
         // 吸収がなければ INSERT 済みなのでそのまま
@@ -595,9 +579,9 @@ app.get("/order", (req,res) => {
   })
 
   function recalcAfterDelete(orders, reservations, context) {
-  const results = [];
+    const results = [];
 
-  for (const order of orders) {
+    for (const order of orders) {
     
                   
     const info = updateTimes(order, reservations, context);
@@ -611,9 +595,9 @@ app.get("/order", (req,res) => {
       endTime: info.endTime,
       saveTime: info.saveTime
     });
-  }
+    }
 
-  return results;
+    return results;
 }
 
 
@@ -775,78 +759,7 @@ app.get('/timeline/del', (req, res) => {
 });
 
 
-// 後続注文を調整する関数（予約優先＋通常注文は調理時間分ずらす）
-function adjustOrders(subsequentOrders, canceledOrder, callback) {
-    let reservedTimes = []; // 予約注文のcompletion_timeを記録
 
-    // 1. 予約注文のcompletion_timeだけ記録
-    subsequentOrders.forEach(order => {
-        if (order.reservation == 1) {
-            reservedTimes.push(new Date(order.time));
-            
-        }
-        
-    });
-
-    let index = 0;
-    let lastAvailableTime = new Date(canceledOrder.time);
-
-    
-    function processNext(err) {
-
-        if (err || index >= subsequentOrders.length) {
-            callback(err);
-            return;
-        }
-
-        let order = subsequentOrders[index++];
-
-        if (order.reservation == 1) {
-            processNext();
-        } else {
-            const cookMinutes = Math.ceil(order.number * 6 / 60); // 1本6秒換算
-           
-            let proposedStartTime = new Date(lastAvailableTime);
-
-            let proposedEndTime = new Date(proposedStartTime.getTime() + cookMinutes * 60 * 1000);
-                                  
-
-            let overlap;
-            do {
-                overlap = reservedTimes.some(reservedDate => {
-                    let reservedStart = new Date(reservedDate.getTime() - cookMinutes * 60 * 1000);
-        
-                    return (proposedEndTime > reservedStart && proposedStartTime < reservedDate);
-                });
-              
-                if (overlap) {
-                    // 重なってたら、調理時間分後ろにずらす
-                    let nearestReserved = reservedTimes.find(reservedDate => {
-                      let reservedStart = new Date(reservedDate.getTime() - cookMinutes * 60 * 1000);
-                      return (proposedEndTime > reservedStart && proposedStartTime < reservedDate);
-                    })
-                    proposedStartTime = new Date(nearestReserved.getTime());
-                    proposedEndTime = new Date(proposedStartTime.getTime() + cookMinutes * 60 * 1000);    
-                }
-            } while (overlap);
-
-
-            let formattedTime = toDatetimeLocalString(lastAvailableTime);
-            const updateSql = `UPDATE form_data SET time = ? WHERE id = ?`;
-            db.run(updateSql, [formattedTime, order.id], (err) => {
-                if (err) return callback(err);
-
-                  console.log(`注文ID:${order.id} 更新 → ${formattedTime}`);
-                    
-                  lastAvailableTime = proposedEndTime
-                  processNext();
-                });
-        }
-    }
-
-    processNext();
-
-}
 
 // ISOをdatetime-local形式に変換
 function toDatetimeLocalString(utcString) {
@@ -875,7 +788,7 @@ function toDatetimeLocalString(utcString) {
         finishedOrder.reservation == 1
           ? new Date(finishedTimeRaw.getTime() - 5 * 60 * 1000)
           : finishedTimeRaw;
-
+      console.log('finishedEndTime:',finishedEndTime)
 
       db.run(
         "UPDATE form_data SET done = 1 WHERE id = ?",
@@ -912,8 +825,6 @@ function toDatetimeLocalString(utcString) {
                     
                   })
             subsequentOrders.sort((a, b) => a.startTime - b.startTime);
-            let targetTime = new Date(finishedOrder.time).toISOString();
-              console.log('target:',targetTime)
               
 
               const now = new Date();
@@ -921,7 +832,7 @@ function toDatetimeLocalString(utcString) {
               
               
               db.get("SELECT * FROM form_data WHERE time < ? and done = 0 ORDER BY time DESC LIMIT 1",
-                [targetTime],(err, prevRow) => {
+                [finishedEndTime.toISOString()],(err, prevRow) => {
                   console.log('prevRow:',prevRow)
                 // prevRow が null の場合もある
                   
@@ -949,10 +860,11 @@ function toDatetimeLocalString(utcString) {
                     }
                   } else {
                     console.log('prevRowはない')
-                    deletedOrderedMs = new Date(finishedOrder.time).getTime() - new Date().getTime();
+                    deletedOrderedMs = new Date(finishedEndTime).getTime() - new Date().getTime();
                     baseTime = new Date(); // 先頭を消した場合
+                    gapMs = 0;
                     console.log('prevrowなし:', deletedOrderedMs)
-                    
+                    console.log('prevrowはない内gapMs:',gapMs)
                   }
                   console.log('baseTime結果:', baseTime)
                   
@@ -1025,166 +937,7 @@ function toDatetimeLocalString(utcString) {
       )
     })
     })
-  
-let difference = 0;
-function modifyOrders(subsequentOrders, finishedOrder, wss, callback) {
-  let now = new Date();
-  difference = now - new Date(finishedOrder.time);
-  if(difference !== 0 && wss) {
-    console.log('wss:', difference)
-        const message = JSON.stringify({ type:'modify', amount: Math.floor(difference / 1000) });
-        
 
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            console.log("WS send:", message);
-            
-              client.send(message);
-          }
-        });
-      };
-
-  if(finishedOrder.reservation == 1) {
-    difference = now - new Date(new Date(finishedOrder.time).getTime() - 5 * 60 * 1000);
-  } 
-
-  
-  let reservedTimes = [];
-  subsequentOrders.forEach(order => {
-    
-    if(order.reservation === 1) {
-      reservedTimes.push(order.time);
-    }
-  })
-
-   
-
-    
-    let diff = Math.floor(difference / 60000);
-    
-    console.log(difference)
-    console.log(diff);
-    console.log(`now: ${now}`);
-  
-
-    let index = 0;
-    let modifiedTime = new Date();
-    let proposedStartTime;
-    let proposedEndTime;
-    let overlapTimes = 0;
-    function processNext(err) {
-    
-      if (err || index >= subsequentOrders.length) {
-        callback(err);
-        return;
-      }
-      let order = subsequentOrders[index];
-      let unreservedTimes =[];
-      if(order.reservation === 1) {
-        
-        index++;
-        processNext();
-      } else if(order.reservation === 0) {
-        console.log(1)
-        const cookMs = Math.ceil(order.number / 10 * 60 * 1000); // 1本6秒換算
-          if(index == 0) {
-            modifiedTime = new Date(new Date(order.time).getTime() - cookMs + difference);
-            console.log(`modifiedTime: ${modifiedTime}`);
-              console.log(2)
-            } else {
-              console.log('modifiedTime(before):',modifiedTime)
-            modifiedTime = new Date(modifiedTime.getTime());
-              console.log('modifiedTime(after):',modifiedTime)
-                console.log(3)
-            }
-            index++;
-      
-           
-            proposedStartTime = new Date(modifiedTime);
-            proposedEndTime = new Date(proposedStartTime.getTime() + cookMs);
-                                   
-
-            let overlap;
-            let overlapCount = 0;
-            do {
-                overlap = reservedTimes.some(resTime => {
-                    let resDate = new Date(resTime);
-                    let resEnd = new Date(resDate.getTime() - 5 * 60 * 1000);
-                    let resStart = new Date(resEnd.getTime() - cookMs);
-                    console.log('reservedTimes', reservedTimes)
-                    console.log('reservedDate',toDatetimeLocalString(resDate))
-                    console.log('reservedEnd',toDatetimeLocalString(resEnd))
-                    console.log('reservedStart', toDatetimeLocalString(resStart));
-                    console.log('proposedStartTime',toDatetimeLocalString(proposedStartTime));
-                    console.log('proposedEndTime', toDatetimeLocalString(proposedEndTime));
-                    return (proposedEndTime > resStart && proposedStartTime < resEnd);
-                });
-                console.log('overlap',overlap)
-                if (overlap) {
-                    if (proposedStartTime < now) { 
-                      newGapMs = Math.max(0, resStart - now);
-                      console.log('modifynewgapMs:', newGapMs)
-                      console.log('ovelap:', gapMs) // 実際の残り時間 
-    
-              } else { 
-                      newGapMs = Math.max(0, resStart - proposedStartTime);
-
-                      console.log('ovelap2:', gapMs) // 予定上の gap }
-                    } 
-                    // 重なってたら、調理時間分後ろにずらす
-                    proposedStartTime = new Date(proposedStartTime.getTime() + 1 * 60 * 1000);
-                    proposedEndTime = new Date(proposedStartTime.getTime() + cookMs);    
-                    console.log('proposedStartTime:',proposedStartTime)
-                    
-                }
-                    
-                  
-            } while (overlap);
-                    console.log('proposedStartTime(overlap1):', proposedStartTime);
-                    console.log(unreservedTimes);
-                    console.log('overlapCount:', overlapCount)
-            let overlap2;
-            do {
-                overlap2 = unreservedTimes.some(Time => {
-                    let unreservedEnd = new Date(Time);
-                    let unreservedStart = new Date(unreservedEnd.getTime() - cookMs);
-                    
-                    return (proposedEndTime > unreservedStart && proposedStartTime < unreservedEnd);
-                });
-                console.log('overlap',overlap)
-                if (overlap2) {
-                    // 重なってたら、調理時間分後ろにずらす
-                    proposedStartTime = new Date(proposedStartTime.getTime() + 1 * 60 * 1000);
-                    proposedEndTime = new Date(proposedStartTime.getTime() + cookMs);    
-                    
-                }
-                    unreservedTimes.push({start:proposedStartTime,end:proposedEndTime})
-            } while (overlap2);
-              console.log('proposedStartTime(overlap2):', proposedStartTime);
-              
-              
-                    modifiedTime = proposedEndTime;
-      let formattedTime = toDatetimeLocalString(modifiedTime);
-      const updateSql = `UPDATE form_data SET time = ? WHERE id = ?`;
-            db.run(updateSql, [formattedTime, order.id], (err) => {
-                if (err) {
-                    console.error('更新エラー:', err.message);
-                    callback(err);
-                } else {
-                  console.log(`注文ID:${order.id} 更新 → ${formattedTime}`);
-                    console.log('ok')
-                  console.log('modifiedTime(end):',modifiedTime)
-                   processNext();
-                }
-                
-            });
-          }
-    }
-    processNext();
-    
-  
-
-}
 
      
 

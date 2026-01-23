@@ -218,8 +218,8 @@ timeInput.addEventListener('blur', function () {
     isUserEditingTime = false;
 });
 
-
-    const socket = new WebSocket('ws://localhost:3001');
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    const socket = new WebSocket(`${protocol}://${location.host}`);
 
     socket.onopen = function() {
         console.log("✅ WebSocket 接続成功");
@@ -228,24 +228,26 @@ timeInput.addEventListener('blur', function () {
     socket.onmessage = function(event) {
         const message = JSON.parse(event.data);
         console.log("📩 タイマー値を受信:", message.timerValue);
-        console.log('amount:', message)
-        // チェックボックスの状態に応じて `is_reservation` の値を変更
-        
-            if (message.type === 'update' && document.getElementById("is_reservation").checked === false ) {
-                console.log(wait_minutes)
-                    timerValue = message.timerValue;
-                    updateTimer();
-                    if (!isUserEditingTime) inputWaitTime();  // 入力中でなければ上書き
-                } 
 
-            if (message.type === 'gap') {
-                console.log('gap送信',timerValue)
-            
-                socket.send(JSON.stringify({ action: 'increase', amount: message.amount}))
-            }
+        if (
+            message.type === 'update' &&
+            document.getElementById("is_reservation").checked === false
+        ) {
+            timerValue = message.timerValue;
+            updateTimer();
+            if (!isUserEditingTime) inputWaitTime();
+        }
 
-            
+        if (message.type === 'gap') {
+            if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                action: 'increase',
+                amount: message.amount
+            }));
             }
+        }
+        };
+
         
             document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
                 document.getElementById("is_reservation").value = this.checked ? "1" : "0";
@@ -434,7 +436,7 @@ timeInput.addEventListener('blur', function () {
     
     setInterval(function() {
         window.location.reload()
-      }, 1000 * 60)
+      }, 1000 * 60 * 5)
 
 
 
