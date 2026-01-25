@@ -203,6 +203,7 @@
       </button>
 <script>
 
+updateTimeEditState(); // 初期化
 let timerValue = 0;
 let now = new Date();
 let tv = parseInt(timerValue, 10);
@@ -220,6 +221,15 @@ timeInput.addEventListener('focus', function () {
 timeInput.addEventListener('blur', function () {
     isUserEditingTime = false;
 });
+
+function updateTimeEditState() {
+    const isReservation = document.getElementById("is_reservation_checkbox").checked;
+    timeInput.readOnly = !isReservation;
+}
+
+document.getElementById("is_reservation_checkbox")
+    .addEventListener("change", updateTimeEditState);
+
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${protocol}://${location.host}`);
@@ -444,6 +454,7 @@ timeInput.addEventListener('blur', function () {
 
 
     
+    updateTimeEditState();
 
     
 </script>
