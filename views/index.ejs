@@ -227,8 +227,7 @@ function updateTimeEditState() {
     timeInput.readOnly = !isReservation;
 }
 
-document.getElementById("is_reservation_checkbox")
-    .addEventListener("change", updateTimeEditState);
+
 
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -300,7 +299,7 @@ document.getElementById("is_reservation_checkbox")
 
 
             inputWaitTime();
-           
+            updateTimeEditState();
     };
 
     
@@ -452,9 +451,12 @@ document.getElementById("is_reservation_checkbox")
       }, 1000 * 60 * 5)
 
 
+    document.getElementById("is_reservation_checkbox")
+    .addEventListener("change", updateTimeEditState);
+
 
     
-    updateTimeEditState();
+   
 
     
 </script>
