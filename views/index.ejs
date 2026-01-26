@@ -203,7 +203,6 @@
       </button>
 <script>
 
-updateTimeEditState(); // 初期化
 let timerValue = 0;
 let now = new Date();
 let tv = parseInt(timerValue, 10);
@@ -221,14 +220,6 @@ timeInput.addEventListener('focus', function () {
 timeInput.addEventListener('blur', function () {
     isUserEditingTime = false;
 });
-
-function updateTimeEditState() {
-    const isReservation = document.getElementById("is_reservation_checkbox").checked;
-    timeInput.readOnly = !isReservation;
-}
-
-
-
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${protocol}://${location.host}`);
@@ -299,7 +290,7 @@ function updateTimeEditState() {
 
 
             inputWaitTime();
-            updateTimeEditState();
+           
     };
 
     
@@ -385,12 +376,7 @@ function updateTimeEditState() {
         document.getElementById('time').value = localDateTime;
       }
 
-    form.addEventListener("submit", function () {
-        if (!timeInput.value) {
-            inputWaitTime();
-        }
-    });
-
+      
 
     setInterval(function() {
         wait_minutes = new Date(new Date().getTime() + timerValue * 1000); // 最新に更新
@@ -456,12 +442,8 @@ function updateTimeEditState() {
       }, 1000 * 60 * 5)
 
 
-    document.getElementById("is_reservation_checkbox")
-    .addEventListener("change", updateTimeEditState);
-
 
     
-   
 
     
 </script>
