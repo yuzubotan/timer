@@ -144,72 +144,63 @@ app.get('/timeline', (req, res) => {
 
     
     
-let gapMs = 0;
+
 let previousGapMs = 0;
-let gapPeriods = [];
-let resStartList = [];
-let newGapMs;
+
 
 
 function calculateTimes(order, reservations, context) {
-  
-  const { now, resStartList, gapPeriods } = context;
+  const { now } = context;
   const prepDurationMs = (order.number / 10) * 60000;
-  
+
+  let gapMs = 0;
+  let newGapMs = 0;
+
   if (order.reservation === 1) {
-    // 予約注文
-    const resTime = new Date(new Date(order.time));       // ユーザー指定の予約時刻
-    const endTime = new Date(resTime.getTime() - 5 * 60000); // 完成は予約の5分前
+    const resTime = new Date(order.time);
+    const endTime = new Date(resTime.getTime() - 5 * 60000);
     const startTime = new Date(endTime.getTime() - prepDurationMs);
-    return { startTime, endTime, saveTime: resTime, gapMs: 0, }; // DBには予約時刻を保存
-  } else {
-    // 非予約注文
-    
-    let startTime = new Date(new Date(order.time).getTime() - context.deletedOrderedMs);
-    
-    let endTime = new Date(startTime.getTime() + prepDurationMs);
+
+    return {
+      startTime,
+      endTime,
+      saveTime: resTime,
+      gapMs: 0,
+      newGapMs: 0
+    };
+  }
+
+  // 非予約
+  let startTime = new Date(order.time);
+  let endTime = new Date(startTime.getTime() + prepDurationMs);
 
   for (const row of reservations) {
     const resTime = new Date(row.time);
     const resEnd = new Date(resTime.getTime() - 5 * 60000);
     const resPrepMs = (row.number / 10) * 60000;
     const resStart = new Date(resEnd.getTime() - resPrepMs);
-    const resStartStr = resStart.toISOString();
-    if(!resStartList.includes(resStartStr)) {
-      resStartList.push(resStartStr);
-    }
-  const overlap = startTime < resEnd && endTime > resStart;
-  
-  if (overlap) { 
-    
-    if (startTime < now) { 
-      newGapMs = Math.max(0, resStart - now);
-    
-    } else { 
-      newGapMs = Math.max(0, resStart - startTime);
 
-} 
-      gapMs += newGapMs;
+    const overlap = startTime < resEnd && endTime > resStart;
 
-        
-        gapPeriods.push({
-          gap: newGapMs,
-          start: new Date(resStart.getTime() - newGapMs),
-          endTime: resStart
-        });
+    if (!overlap) continue;
 
-        startTime = new Date(resEnd); 
-        endTime = new Date(startTime.getTime() + prepDurationMs); // gapMs は「待ち時間の追加」として送信 
-        
-        
-    }
-    
-   
-}
-return { startTime, endTime, saveTime: endTime, gapMs, newGapMs }; // DBには完了時刻を保存
-}
-    
+    const base = startTime < now ? now : startTime;
+    newGapMs = Math.max(0, resStart - base);
+    gapMs += newGapMs;
+
+    startTime = new Date(resEnd);
+    endTime = new Date(startTime.getTime() + prepDurationMs);
   }
+
+  return {
+    startTime,
+    endTime,
+    saveTime: endTime,
+    gapMs,
+    newGapMs
+  };
+}
+
 
 
 let lastEndTime = null;
