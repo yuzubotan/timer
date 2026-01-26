@@ -978,6 +978,8 @@ function toDatetimeLocalString(utcString) {
     })
   })
 
-
+  app.get('/customer', (req, res) => {
+    res.render('customer');
+  })
 
 
