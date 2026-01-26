@@ -385,7 +385,12 @@ function updateTimeEditState() {
         document.getElementById('time').value = localDateTime;
       }
 
-      
+    form.addEventListener("submit", function () {
+        if (!timeInput.value) {
+            inputWaitTime();
+        }
+    });
+
 
     setInterval(function() {
         wait_minutes = new Date(new Date().getTime() + timerValue * 1000); // 最新に更新

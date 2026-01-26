@@ -399,8 +399,20 @@ function calculateGapTime(gapMs, newGapMs, wss) {
     const { time, number, reservation } = req.body;
     const orderedtime = new Date();
 
+    let orderTime;
+
+    if (time) {
+        orderTime = new Date(time);
+    }
+
+    if (!orderTime || isNaN(orderTime.getTime())) {
+        console.error("❌ invalid time from client:", time);
+        orderTime = new Date(); // 最低限の保険
+    }
+
+
     const order = {
-        time: new Date(time),
+        time: orderTime,
         number: Number(number),
         reservation: Number(reservation)
       };
@@ -424,7 +436,17 @@ function calculateGapTime(gapMs, newGapMs, wss) {
           gapMs: 0
         };
         const { saveTime, gapMs, newGapMs } = calculateTimes(order, reservations, context);
-      console.log('newGap:', newGapMs)
+        
+        if (!saveTime || isNaN(saveTime.getTime())) {
+          console.error("❌ Invalid saveTime", {
+              saveTime,
+              order,
+              reservation: order.reservation
+          });
+          saveTime = new Date();
+      }
+
+        console.log('newGap:', newGapMs)
         const wss = req.app.locals.wss;
         calculateGapTime(gapMs, newGapMs, wss);
       
