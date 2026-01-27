@@ -1,0 +1,11 @@
+# node modules
+node_modules/
+
+# environment variables
+.env
+
+# SQLite database (ローカル用)
+data/form_data
+
+# OS / editor
+.DS_Store
