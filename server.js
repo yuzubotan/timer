@@ -1,4 +1,7 @@
 
+require('dotenv').config();
+console.log(process.env.TZ);
+console.log(new Date().toString());
 const app = require('./index');
 const PORT = process.env.PORT || 3001;
 const http = require('http');
