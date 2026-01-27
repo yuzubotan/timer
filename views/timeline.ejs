@@ -154,7 +154,7 @@
     </header>
     <div id="wait_time">0:00:00</div>
     <div class="timeline-container">
-        <div class="timeline">
+        <div class="timeline" style="top:150px">
           
       
           
@@ -163,7 +163,7 @@
           <% for (const item of data) { %>
             <% 
               const currentTime = new Date();
-              let itemTop = 250 + ((Math.floor(item.hour * 12) + Math.floor(item.minutes / 5)) * 200 + (item.minutes % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
+              let itemTop = 350 + ((Math.floor(item.hour * 12) + Math.floor(item.minutes / 5)) * 200 + (item.minutes % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
             %>
             
             <% if(itemTop >= 0) { %>
