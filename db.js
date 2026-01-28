@@ -32,6 +32,18 @@ db.serialize(() => {
       reservation INTEGER default 0
     )
   `);
+  db.all(`PRAGMA table_info(form_data)`, (err, columns) => {
+    if (err) {
+      console.error("テーブル情報取得エラー:", err);
+      return;
+    }
+
+    const hasDone = columns.some(col => col.name === 'done');
+
+    if (!hasDone) {
+      db.run(`ALTER TABLE form_data ADD COLUMN done INTEGER DEFAULT 0`);
+    }
+  });
 });
 
 module.exports = db;
