@@ -3,7 +3,6 @@ require('dotenv').config();
 console.log(process.env.TZ);
 console.log(new Date().toString());
 const app = require('./index');
-const PORT = process.env.PORT || 3001;
 const http = require('http');
 const db = require('./db');
 const WebSocket = require('ws');
@@ -15,9 +14,12 @@ app.locals.wss = wss;
 
 let reduceRemainderMs = 0;
 
-server.listen(PORT, () => {
-    console.log(`Server is running on ${PORT} `);
-})
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on ${PORT}`);
+});
+
+
 
 let timerValue = 60; // 初期値（例）
 
