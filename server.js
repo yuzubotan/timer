@@ -398,8 +398,9 @@ function calculateGapTime(gapMs, newGapMs, wss) {
   return { merged, absorbedIds };
 }
 
-
+  
   app.post('/submit', (req, res) => {
+    
     deletedOrderedMs = 0;
     const { time, number, reservation } = req.body;
     const orderedtime = new Date();

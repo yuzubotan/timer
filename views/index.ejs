@@ -150,6 +150,13 @@
         <span id="order" class="header" onclick="location.href='/order'">注文履歴</span>
         <span id="switch" class="header" onclick="location.href='/timeline'">switch</span>
     </header>
+    <audio id="btn_audio">
+        <source src= "/sound/pushNumber.mp3">
+    </audio>
+
+    <audio id="btn_audio2">
+        <source src= "/sound/submit.mp3">
+    </audio>
     <div id="wait_time">0:00:00</div>
     <button type="button" id="switch_bt">ON/OFF</button>
     <div class="grid-container">
@@ -166,7 +173,7 @@
                 
                 <!-- チェックボックスの状態を反映する隠しフィールド -->
                 <input type="hidden" name="reservation" id="is_reservation" value="0">
-                <input type="submit" id="submit_bt" class="grid-item grid-4">
+                <input type="submit" id="submit_bt" onclick="audio2()" class="grid-item grid-4">
                 
             </form>
             
@@ -221,6 +228,39 @@ timeInput.addEventListener('blur', function () {
     isUserEditingTime = false;
 });
 
+function speak(text) {
+    // 連続送信対策
+    speechSynthesis.cancel();
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'ja-JP';
+    utter.rate = 2.0;
+    utter.pitch = 1.5;
+
+    speechSynthesis.speak(utter);
+}
+
+document.getElementById('form').addEventListener('submit', function () {
+    const isReservation = document.getElementById('is_reservation').value === "1";
+    const addSeconds = document.getElementById('number').value / 10 * 60;
+
+    if (isReservation) {
+        speak('予約注文を受け付けました');
+    } else {
+        const minutes = Math.floor(( timerValue + addSeconds ) / 60);
+        speak(`注文を受け付けました。待ち時間は約${minutes}分です`);
+    }
+});
+
+
+function audio() {
+    
+    document.getElementById('btn_audio').currentTime = 0; //連続クリックに対応
+    document.getElementById('btn_audio').play(); //クリックしたら音を再生
+}
+
+
+
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
     const socket = new WebSocket(`${protocol}://${location.host}`);
 
@@ -268,6 +308,7 @@ timeInput.addEventListener('blur', function () {
   
     function addNumber(num) {
         number.value += num;
+        audio();
     }
 
     function deleteLast() {
