@@ -234,7 +234,7 @@ timeInput.addEventListener('blur', function () {
 
         if (
             message.type === 'update' &&
-            document.getElementById("is_reservation").checked === false
+            document.getElementById("is_reservation").value === "0"
         ) {
             timerValue = message.timerValue;
             updateTimer();
