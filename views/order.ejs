@@ -47,7 +47,9 @@
                 <%= timeObject2.toLocaleString('ja-JP',{hour: '2-digit', minute: '2-digit'}) %>
              </td>
              
-             <td><a href="javascript:del(<%= data[i].id %>)">[del]</a></td>
+             <td><a href="javascript:del(<%= data[i].id %>)">[del]</a>
+                 <a href="./timeline/modify?id=<%= data[i].id %>">[ok]</a>
+            </td>
           </tr>
           <tr class="border">
              <td class="cel"><%= data[i].number %>本</td>

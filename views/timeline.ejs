@@ -154,7 +154,7 @@
     </header>
     <div id="wait_time">0:00:00</div>
     <div class="timeline-container">
-        <div class="timeline" style="top:250px">
+        <div class="timeline" style="top:300px">
           
       
           
@@ -163,7 +163,7 @@
           <% for (const item of data) { %>
             <% 
               const currentTime = new Date();
-              let itemTop = 450 + ((Math.floor(item.hour * 12) + Math.floor(item.minutes / 5)) * 200 + (item.minutes % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
+              let itemTop = 500 + ((Math.floor(item.hour * 12) + Math.floor(item.minutes / 5)) * 200 + (item.minutes % 5) * 40) - ((currentTime.getHours() * 12 + Math.floor(currentTime.getMinutes() / 5)) * 200  + (currentTime.getMinutes() % 5 * 40));
             %>
             
             <% if(itemTop >= 0) { %>
@@ -325,7 +325,7 @@ for (let i = 0; i <= totalSteps; i++) {
 
 // 縦スクロールを時間経過とリンク
 let scrollPosition = 0;
-const scrollSpeed = 0.025; // スクロールの速さ（px単位）
+const scrollSpeed = 0.01; // スクロールの速さ（px単位）
 
 function scrollTimeline() {
   scrollPosition += scrollSpeed;
