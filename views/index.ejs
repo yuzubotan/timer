@@ -81,7 +81,7 @@
         width: 100px;
        }
 
-       .hidden {
+       .grid-5 {
         display: none;
         
        }
@@ -170,7 +170,7 @@
                 
             </form>
             
-            <div class="grid-5 hidden" id="grid-5">
+            <div class="grid-5" id="grid-5">
                 <div class="addTime">
                     <button class="time" id="1minute--">- 1:00</button>
                     <button class="time" id="1minute++">+ 1:00</button>
@@ -387,11 +387,17 @@ timeInput.addEventListener('blur', function () {
       
 
     let switch_bt = document.getElementById('switch_bt');
+    let form = document.getElementById('form');
     let grid5 = document.getElementById('grid-5');
     switch_bt.addEventListener('click', function() {
-        switch_bt.addEventListener('click', function () {
-        grid5.classList.toggle('hidden');
-        });
+        
+        if(form.classList.contains('grid-5')) {
+            form.classList.remove('grid-5');
+            grid5.classList.add('grid-5')
+        } else {
+            form.classList.add('grid-5')
+            grid5.classList.remove('grid-5');
+        }
     })
 
     let s = 55;
@@ -431,9 +437,9 @@ timeInput.addEventListener('blur', function () {
             });
 
     
-    setInterval(function() {
-        window.location.reload()
-      }, 1000 * 60 * 5)
+    //setInterval(function() {
+     //   window.location.reload()
+      //}, 1000 * 60 * 5)
 
 
 
