@@ -318,7 +318,7 @@ timeInput.addEventListener('blur', function () {
             number: <%= data[i].number / 10 %>, 
             checked: <%= data[i].checked %>, 
             reservation: <%= data[i].reservation %>, 
-            absorbed: <%= data[i].absorbed %>,
+            absorbed: <%= data[i].absorbed ?? 0 %>,
             time: new Date('<%= data[i].time %>')
         };
         let timeToStart<%- i %> = new Date(addTime<%- i %>.time.getTime() - needMinutes<%- i %> * 60 * 1000);
@@ -378,27 +378,27 @@ timeInput.addEventListener('blur', function () {
 
       
 
-    //setInterval(function() {
-        //wait_minutes = new Date(new Date().getTime() + timerValue * 1000); // 最新に更新
-        //addTelOrder();
+    setInterval(function() {
+        wait_minutes = new Date(new Date().getTime() + timerValue * 1000); // 最新に更新
+        addTelOrder();
         
-    //}, 1000);
+    }, 1000);
 
       
 
     let switch_bt = document.getElementById('switch_bt');
     let form = document.getElementById('form');
     let grid5 = document.getElementById('grid-5');
-    //switch_bt.addEventListener('click', function() {
+    switch_bt.addEventListener('click', function() {
         
-        //if(form.classList.contains('grid-5')) {
-            //form.classList.remove('grid-5');
+        if(form.classList.contains('grid-5')) {
+            form.classList.remove('grid-5');
             grid5.classList.add('grid-5')
-        //} else {
-            //form.classList.add('grid-5')
-           // grid5.classList.remove('grid-5');
-        //}
-    //})
+        } else {
+            form.classList.add('grid-5')
+            grid5.classList.remove('grid-5');
+        }
+    })
 
     let s = 55;
   
@@ -437,9 +437,9 @@ timeInput.addEventListener('blur', function () {
             });
 
     
-    //setInterval(function() {
-     //   window.location.reload()
-      //}, 1000 * 60 * 5)
+    setInterval(function() {
+        window.location.reload()
+      }, 1000 * 60 * 5)
 
 
 
