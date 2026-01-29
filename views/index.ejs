@@ -155,8 +155,9 @@
     </audio>
 
     <audio id="btn_audio2">
-        <source src= "/sound/submit.mp3">
+        <source src= "/sound/module.mp3">
     </audio>
+
     <div id="wait_time">0:00:00</div>
     <button type="button" id="switch_bt">ON/OFF</button>
     <div class="grid-container">
@@ -173,7 +174,7 @@
                 
                 <!-- チェックボックスの状態を反映する隠しフィールド -->
                 <input type="hidden" name="reservation" id="is_reservation" value="0">
-                <input type="submit" id="submit_bt" onclick="audio2()" class="grid-item grid-4">
+                <input type="submit" id="submit_bt" class="grid-item grid-4">
                 
             </form>
             
@@ -208,6 +209,24 @@
     <button type="button" onclick="location.href='/customer'">
         customer
       </button>
+    <!-- 確認モーダル -->
+<div id="confirmModal" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  justify-content:center;
+  align-items:center;
+  z-index:9999;
+">
+  <div style="background:white; padding:20px; border-radius:8px; min-width:260px;">
+    <p id="confirmText">この注文を追加しますか？</p>
+    <button id="confirmOk">OK</button>
+    <button id="confirmCancel">キャンセル</button>
+    <p id="countdown"></p>
+  </div>
+</div>
+
 <script>
 
 let timerValue = 0;
@@ -234,7 +253,7 @@ function speak(text) {
 
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'ja-JP';
-    utter.rate = 2.0;
+    utter.rate = 1.5;
     utter.pitch = 1.5;
 
     speechSynthesis.speak(utter);
@@ -257,6 +276,12 @@ function audio() {
     
     document.getElementById('btn_audio').currentTime = 0; //連続クリックに対応
     document.getElementById('btn_audio').play(); //クリックしたら音を再生
+}
+
+function audio2() {
+    
+    document.getElementById('btn_audio2').currentTime = 0; //連続クリックに対応
+    document.getElementById('btn_audio2').play(); //クリックしたら音を再生
 }
 
 
@@ -348,57 +373,79 @@ function audio() {
     
     let gapSent = false;
   
-    function addTelOrder() {
+    async function addTelOrder() {
 
-      let earliestReservationStart = null;
-    
-      <% for (let i = 0; i < data.length ; i++) { %>
-        let needMinutes<%- i %> = <%= data[i].number / 10 + 5 %>; // 本数 ÷10 +5分
-        let addTime<%- i %> = { 
-            id: <%= data[i].id %>, 
-            number: <%= data[i].number / 10 %>, 
-            checked: <%= data[i].checked %>, 
-            reservation: <%= data[i].reservation %>, 
-            absorbed: <%= data[i].absorbed ?? 0 %>,
-            time: new Date('<%= data[i].time %>')
-        };
-        let timeToStart<%- i %> = new Date(addTime<%- i %>.time.getTime() - needMinutes<%- i %> * 60 * 1000);
+  if (isModalOpen) return;
 
-        // ① 予約注文の最も早い開始時刻を記録
-        if (addTime<%- i %>.reservation === 1) {
-            if (!earliestReservationStart || timeToStart<%- i %> < earliestReservationStart) {
-                earliestReservationStart = timeToStart<%- i %>;
-                
-            };
-        }
+  let earliestReservationStart = null;
 
-        // ② 通常注文が予約前に入れられるなら送信してタイマー更新
-        if (
-            addTime<%- i %>.checked === 0 &&
-            addTime<%- i %>.reservation === 0
-        ) {
-            if (!earliestReservationStart || wait_minutes < earliestReservationStart) {
-                // ✅ 予約の前に入れられる
-                
-                socket.send(JSON.stringify({ action: 'increase', amount: addTime<%- i %>.number * 60 }));
-                window.location = "/checked?id=" + addTime<%- i %>.id;
-                
-            } 
-            
-        }
-        if (wait_minutes > timeToStart<%- i %> && addTime<%- i %>.checked === 0 && addTime<%- i %>.reservation === 1) {
-            let amount = addTime<%- i %>.number * 60;
-            if(addTime<%- i %>.absorbed == 1) {
-                
-                amount -= addTime<%- i %>.number * 60
-            }
-       socket.send(JSON.stringify({ action: 'increase', amount: amount}))
-                                    
-       window.location="/checked?id=" + addTime<%- i %>.id;
-       return;
-     }
-    <% } %>
+  <% for (let i = 0; i < data.length ; i++) { %>
+
+    let needMinutes<%- i %> = <%= data[i].number / 10 + 5 %>;
+    let addTime<%- i %> = { 
+      id: <%= data[i].id %>, 
+      number: <%= data[i].number / 10 %>, 
+      checked: <%= data[i].checked %>, 
+      reservation: <%= data[i].reservation %>, 
+      absorbed: <%= data[i].absorbed ?? 0 %>,
+      time: new Date('<%= data[i].time %>')
+    };
+
+    let timeToStart<%- i %> =
+      new Date(addTime<%- i %>.time.getTime() - needMinutes<%- i %> * 60 * 1000);
+
+    // ① 予約の最も早い開始時刻
+    if (addTime<%- i %>.reservation === 1) {
+      if (!earliestReservationStart || timeToStart<%- i %> < earliestReservationStart) {
+        earliestReservationStart = timeToStart<%- i %>;
+      }
+    }
+
+    // ② 通常注文
+    if (
+      addTime<%- i %>.checked === 0 &&
+      addTime<%- i %>.reservation === 0 &&
+      (!earliestReservationStart || wait_minutes < earliestReservationStart)
+    ) {
+      socket.send(JSON.stringify({
+        action: 'increase',
+        amount: addTime<%- i %>.number * 60
+      }));
+      window.location = "/checked?id=" + addTime<%- i %>.id;
+      return; // ← 1件処理したら終了はOK
+    }
+
+    // ③ 予約注文（モーダル付き）
+    if (
+      wait_minutes > timeToStart<%- i %> &&
+      addTime<%- i %>.checked === 0 &&
+      addTime<%- i %>.reservation === 1
+    ) {
+      const confirmed = await confirmWithTimeout(
+        `${addTime<%- i %>.time.getHours()}時${addTime<%- i %>.time.getMinutes()}分に${addTime<%- i %>.number * 10} 本の予約を追加しますか？`,
+        15000
+      );
+
+      if (confirmed) {
+        // ❗ この注文だけスキップ（次へ）
+        console.log(456)
+        let amount = addTime<%- i %>.number * 60;
+        if (addTime<%- i %>.absorbed == 1) amount = 0;
+        
+        socket.send(JSON.stringify({ action: 'increase', amount }));
+        window.location = "/checked?id=" + addTime<%- i %>.id;
+        return;
+        
+      } else {
+        window.location = "/checked?id=" + addTime<%- i %>.id;
+        console.log(123)
+        return;
+      }
+    }
+
+  <% } %>
 }
+
 
 
     function inputWaitTime() {
@@ -483,6 +530,54 @@ function audio() {
       }, 1000 * 60 * 5)
 
 
+    let isModalOpen = false;
+
+function confirmWithTimeout(message, timeoutMs = 15000) {
+  return new Promise(resolve => {
+    const modal = document.getElementById("confirmModal");
+    const okBtn = document.getElementById("confirmOk");
+    const cancelBtn = document.getElementById("confirmCancel");
+    const countdown = document.getElementById("countdown");
+    const text = document.getElementById("confirmText");
+
+    
+
+    text.textContent = message;
+    speak(message);
+    modal.style.display = "flex";
+    isModalOpen = true;
+    audio2();
+    let remaining = timeoutMs / 1000;
+    countdown.textContent = `自動確定まで ${remaining} 秒`;
+
+    const interval = setInterval(() => {
+      remaining--;
+      countdown.textContent = `自動確定まで ${remaining} 秒`;
+    }, 1000);
+
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(true);
+    }, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timer);
+      clearInterval(interval);
+      modal.style.display = "none";
+      isModalOpen = false;
+    }
+
+    okBtn.onclick = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    cancelBtn.onclick = () => {
+      cleanup();
+      resolve(false);
+    };
+  });
+}
 
     
 
