@@ -254,7 +254,7 @@ function speak(text) {
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'ja-JP';
     utter.rate = 1.0;
-    utter.pitch = 1.5;
+    utter.pitch = 1.0;
 
     speechSynthesis.speak(utter);
 }
@@ -262,12 +262,13 @@ function speak(text) {
 document.getElementById('form').addEventListener('submit', function () {
     const isReservation = document.getElementById('is_reservation').value === "1";
     const addSeconds = document.getElementById('number').value / 10 * 60;
+    const orderNumber = document.getElementById('number').value;
 
     if (isReservation) {
         speak('予約注文を受け付けました');
     } else {
         const minutes = Math.floor(( timerValue + addSeconds ) / 60);
-        speak(`注文を受け付けました。待ち時間は約${minutes}分です`);
+        speak(`${orderNumber}本の注文を受け付けました。待ち時間は約${minutes}分です`);
     }
 });
 
@@ -430,10 +431,14 @@ function audio2() {
         // ❗ この注文だけスキップ（次へ）
         console.log(456)
         let amount = addTime<%- i %>.number * 60;
-        if (addTime<%- i %>.absorbed == 1) amount = 0;
+        if (addTime<%- i %>.absorbed == 1) {
+            amount = 0;
+        }
+    
         
         socket.send(JSON.stringify({ action: 'increase', amount }));
         window.location = "/checked?id=" + addTime<%- i %>.id;
+        
         return;
         
       } else {

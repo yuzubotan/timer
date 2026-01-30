@@ -922,7 +922,7 @@ function toDatetimeLocalString(utcString) {
                     // 送信可能な「秒」だけ取り出す
                   const reduceSeconds = Math.trunc(reduceRemainderMs / 1000);
                   console.log('reduceSeconds:', reduceSeconds)
-                  if (reduceSeconds !== 0) {
+                  if (reduceSeconds !== 0 && timerValue !== 0) {
                     const message = JSON.stringify({
                       type: 'modify',
                       amount: -reduceSeconds
