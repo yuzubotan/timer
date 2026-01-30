@@ -290,6 +290,22 @@ function updateTimes(order, reservations, context) {
 
       if (overlap) {
         // 予約に当たったら予約の直後へ
+        if (startTime < now) { 
+      newGapMs = Math.max(0, resStart - now);
+    
+    } else { 
+      newGapMs = Math.max(0, resStart - startTime);
+
+} 
+      gapMs += newGapMs;
+
+        
+        gapPeriods.push({
+          gap: newGapMs,
+          start: new Date(resStart.getTime() - newGapMs),
+          endTime: resStart
+        });
+
         startTime = new Date(resEnd);
         endTime = new Date(startTime.getTime() + prepDurationMs);
 
@@ -313,7 +329,7 @@ function updateTimes(order, reservations, context) {
     startTime,
     endTime,
     saveTime: endTime,
-    gapMs: 0,
+    gapMs: gapMs,
   };
 }
 
@@ -847,6 +863,9 @@ function toDatetimeLocalString(utcString) {
                   let baseTime;
                   let deletedOrderedMs;
 
+                  const wss = req.app.locals.wss;
+                  calculateGapTime(gapMs, newGapMs, wss);
+
                   if (prevRow) {
                     console.log('prevRowはある')
                     if (prevRow.reservation === 1) {
@@ -856,15 +875,16 @@ function toDatetimeLocalString(utcString) {
                       const prepMs = (prevRow.number / 10) * 60000;
                       baseTime = new Date(end.getTime()); // ← 完成時刻
                       deletedOrderedMs = finishedOrder.number / 10 * 60 * 1000;
-
+                      
                       console.log('prevRowはあるres1:',baseTime)
                       console.log('prevrow&&res1:', deletedOrderedMs)
                     } else {
                       // 非予約は time = 完了時刻
                       baseTime = new Date(prevRow.time);
                       deletedOrderedMs = finishedOrder.number / 10 * 60 * 1000;
-                       console.log('prevRowはあるres0:',baseTime)
-                       console.log('prevrow&&res0:', deletedOrderedMs)
+                       
+                      console.log('prevRowはあるres0:',baseTime)
+                      console.log('prevrow&&res0:', deletedOrderedMs)
                     }
                   } else {
                     console.log('prevRowはない')
@@ -891,7 +911,7 @@ function toDatetimeLocalString(utcString) {
                   };
 
     
-            const wss = req.app.locals.wss;
+            
              
             let totalReduceMs = context.deletedOrderedMs + gapMs;
                   console.log(gapMs)
