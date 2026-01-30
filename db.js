@@ -39,9 +39,19 @@ db.serialize(() => {
     }
 
     const hasDone = columns.some(col => col.name === 'done');
+    const hasMergedFrom = columns.some(col => col.name === 'merged_from');
+    const hasAbsorbed = columns.some(col => col.name === 'absorbed');
 
     if (!hasDone) {
       db.run(`ALTER TABLE form_data ADD COLUMN done INTEGER DEFAULT 0`);
+    }
+    
+    if (!hasMergedFrom) {
+      db.run(`ALTER TABLE form_data ADD COLUMN merged_from TEXT`);
+    }
+
+    if (!hasAbsorbed) {
+      db.run(`ALTER TABLE form_data ADD COLUMN absorbed INTEGER DEFAULT 0`);
     }
   });
 });
