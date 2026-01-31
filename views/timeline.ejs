@@ -152,12 +152,12 @@
         <span id="order" class="header" onclick="location.href='/order'">注文履歴</span>
         <span id="switch" class="header" onclick="location.href='/'">switch</span>
     </header>
-    <div id="wait_time">0:00:00</div>
+    <span id="wait_time">0:00:00</span>
+    <button id="reload">最新の情報に更新</button>
     <div class="timeline-container">
         <div class="timeline" style="top:300px">
           
       
-          
         </div>
         <div class="timeline2">
           <% for (const item of data) { %>
@@ -201,6 +201,10 @@
       socket.onmessage = function(event) {
 
     console.log("WS received:", event.data);
+
+    document.getElementById('reload').addEventListener('click', ()=>{
+      window.location.reload();
+    })
 
     // JSON に変換
     const message = JSON.parse(event.data);
