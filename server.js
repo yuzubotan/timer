@@ -1013,8 +1013,7 @@ function toDatetimeLocalString(utcString) {
                     }
                   }
                     }
-                )
-  
+                  })  
             })
         console.log('-------------------------------------------')
           res.json({ success: true });
