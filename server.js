@@ -925,6 +925,7 @@ function toDatetimeLocalString(utcString) {
                   const reduceSeconds = Math.trunc(reduceRemainderMs / 1000);
                   console.log('reduceSeconds:', reduceSeconds)
                   if (reduceSeconds !== 0 && timerValue !== 0) {
+                    console.log('modifysendmessage')
                     const message = JSON.stringify({
                       type: 'modify',
                       amount: -reduceSeconds
