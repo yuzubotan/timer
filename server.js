@@ -985,6 +985,8 @@ function toDatetimeLocalString(utcString) {
                     if(!prevRow) {
                       timerValue = Math.floor(trueTimerValue / 1000);
                       console.log('timerValue:',timerValue)
+                      console.log('id:',id)
+                      console.log('lastOrder.id:',lastOrder.id);
                       if(id == lastOrder.id) {
                         console.log(123)
                       timerValue = 0;
