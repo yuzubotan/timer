@@ -423,7 +423,7 @@ function audio2() {
       addTime<%- i %>.reservation === 1
     ) {
       const confirmed = await confirmWithTimeout(
-        `${addTime<%- i %>.time.getHours()}時${addTime<%- i %>.time.getMinutes()}分に${addTime<%- i %>.number * 10} 本の予約を追加しますか？`,
+        `予約を追加しますか？ ${addTime<%- i %>.time.getHours()}時${addTime<%- i %>.time.getMinutes()}分に${addTime<%- i %>.number * 10} 本です`,
         15000
       );
 

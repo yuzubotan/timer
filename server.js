@@ -859,6 +859,8 @@ function toDatetimeLocalString(utcString) {
                 [finishedEndTime.toISOString()],(err, prevRow) => {
                   console.log('prevRow:',prevRow)
                 // prevRow が null の場合もある
+
+                
                   
                   let baseTime;
                   let deletedOrderedMs;
@@ -947,6 +949,9 @@ function toDatetimeLocalString(utcString) {
               
         // 5. まとめて再計算！
               const results = recalcAfterDelete(subsequentOrders, reservations, context);
+              
+             
+
 
         // 6. DBに保存
               for (const item of results) {
@@ -955,6 +960,39 @@ function toDatetimeLocalString(utcString) {
                   item.id
                 ]);
               }
+
+               db.get("SELECT * FROM form_data where checked = 1 and done = 0 order by time desc limit 1",
+                  (err, lastOrder) => {
+                    if(err) {
+                      console.error(err);
+                      return;
+                    }
+
+                    if (!lastOrder) {
+                      console.log('未完了注文が存在しない');
+
+                      timerValue = 0;
+                    } else {
+                    console.log('lastOrder', lastOrder)
+                    const lastFinishedTimeRaw = new Date(lastOrder.time);
+                    const lastFinishedEndTime =
+                      lastOrder.reservation == 1
+                        ? new Date(lastFinishedTimeRaw.getTime() - 5 * 60 * 1000)
+                        : lastFinishedTimeRaw;
+                      console.log('lastFinishedEndTime:',toDatetimeLocalString(lastFinishedEndTime))
+                    const trueTimerValue = lastFinishedEndTime.getTime() - new Date().getTime();
+                    console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
+                    if(!prevRow) {
+                      timerValue = Math.floor(trueTimerValue / 1000);
+                      console.log('timerValue:',timerValue)
+                      if(id == lastOrder.id) {
+                        console.log(123)
+                      timerValue = 0;
+                    }
+                    }
+                  }
+                    }
+                )
   
             })
         console.log('-------------------------------------------')
