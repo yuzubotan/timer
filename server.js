@@ -984,7 +984,25 @@ function toDatetimeLocalString(utcString) {
                     const trueTimerValue = lastFinishedEndTime.getTime() - new Date().getTime();
                     console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
                     if(!prevRow) {
-                      timerValue = Math.floor(trueTimerValue / 1000);
+                      const before = timerValue;
+                      const after = Math.floor(trueTimerValue / 1000);
+                      const diff = after - before;
+
+                      if (diff !== 0) {
+                        const message = JSON.stringify({
+                          type: 'modify',
+                          amount: diff
+                        });
+
+                        wss.clients.forEach(client => {
+                          if (client.readyState === WebSocket.OPEN) {
+                            client.send(message);
+                          }
+                        });
+
+                        timerValue = after; // サーバー側の値も同期
+
+                      
                       console.log('timerValue:',timerValue)
                       console.log('id:',id)
                       console.log('lastOrder.id:',lastOrder.id);
