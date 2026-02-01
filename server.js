@@ -915,34 +915,10 @@ function toDatetimeLocalString(utcString) {
     
             
              
-            let totalReduceMs = context.deletedOrderedMs + gapMs;
-                  console.log(gapMs)
-                  console.log('totalReduceMs:',totalReduceMs / 60 / 1000)
-                  console.log('context.deletedOrderedMs:', context.deletedOrderedMs / 60 / 1000)
-                  reduceRemainderMs += totalReduceMs;
-
-                    // 送信可能な「秒」だけ取り出す
-                  const reduceSeconds = Math.trunc(reduceRemainderMs / 1000);
-                  console.log('reduceSeconds:', reduceSeconds)
-                  if (reduceSeconds !== 0 && timerValue !== 0) {
-                    console.log('modifysendmessage')
-                    const message = JSON.stringify({
-                      type: 'modify',
-                      amount: -reduceSeconds
-                    });
-
-                    wss.clients.forEach(client => {
-                      if (client.readyState === WebSocket.OPEN) {
-                        client.send(message);
-                      }
-                    });
-
-                    // 使った分だけ残りを減らす
-                    reduceRemainderMs -= reduceSeconds * 1000;
-                  }
+    
 
 
-                    gapMs = 0;
+                    
                   
                   
                   console.log('subsequentOrders:',subsequentOrders);
@@ -985,7 +961,7 @@ function toDatetimeLocalString(utcString) {
                     console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
                     if(!prevRow) {
                       const before = timerValue;
-                      const after = Math.floor(trueTimerValue / 1000);
+                      const after = Math.max(0, Math.floor(trueTimerValue / 1000));
                       const diff = after - before;
 
                       if (diff !== 0) {
