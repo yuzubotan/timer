@@ -976,7 +976,7 @@ function toDatetimeLocalString(utcString) {
                           }
                         });
 
-                        timerValue = after; // サーバー側の値も同期
+                        
 
                       
                       console.log('timerValue:',timerValue)
