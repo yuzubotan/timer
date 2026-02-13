@@ -735,13 +735,27 @@ app.get('/timeline/del', (req, res) => {
                     const message = JSON.stringify({
                       type: 'modify',
                       amount: Math.floor(-totalReduceMs / 1000)
+                      
                     });
-
+                    console.log('amount:', message)
                     wss.clients.forEach(client => {
                       if (client.readyState === WebSocket.OPEN) {
                         client.send(message);
                       }
                     });
+
+                    if(gapMs != 0) {
+                      const message1 = JSON.stringify({
+                        type: 'gap',
+                        amount: - gapMs / 1000
+                      });
+                      console.log(message1)
+                      wss.clients.forEach(client => {
+                        if(client.readyState === WebSocket.OPEN) {
+                          client.send(message1);
+                        }
+                      });
+                    }
 
                     console.log('timerValue total reduce:', -totalReduceMs / 1000);
                     gapMs = 0;
@@ -769,7 +783,7 @@ app.get('/timeline/del', (req, res) => {
               
              
 
-                  res.redirect('/timeline');
+                  res.redirect('/');
   
               }
 );
@@ -1038,6 +1052,30 @@ function toDatetimeLocalString(utcString) {
       
       res.redirect('/');
     })
+  })
+
+  app.get('/cancel', (req, res) => {
+    let id = req.query.id;
+    let sql = " where id =" + id;
+    const wss = req.app.locals.wss;
+    db.run(sql, (err) => {
+      console.log('gapMs:', gapMs)
+      if (gapMs !== 0) {
+          const message = JSON.stringify({
+            type: 'modify',
+            amount: -gapMs
+          });
+          console.log('gapMs:',gapMs ) 
+          gapMs = 0;
+          wss.clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+              client.send(message);
+            }
+          });
+          
+      res.redirect('/timeline');
+  }
+})
   })
 
   app.get('/customer', (req, res) => {

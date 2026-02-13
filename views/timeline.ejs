@@ -226,7 +226,7 @@
     console.log(message.action)
     if (message.type === 'modify') {
         console.log('modify 受信 → 加算実行', timerValue);
-
+        
         timerValue += message.amount;
 
         socket.send(

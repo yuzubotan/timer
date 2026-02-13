@@ -164,19 +164,40 @@
         <div class="grid-item grid-1" id="id"></div>
             <form action="/submit" method="POST" id="form">
                 <label for="time" class="label-1">時刻</label><br>
-                <input type="datetime-local" id="time" name="time"  class="grid-item grid-2"><br>
+                <input type="datetime-local" id="time" name="time"  class="grid-item grid-2">
+                <button type="button" onclick="openReservationModal()">予約注文</button><br>
                 <label for="number" class="label-2">本数</label><br>
                 <input type="text" id="number" name="number" class="grid-item grid-3">
-                <label>
-                    <input type="checkbox" id="is_reservation_checkbox">
-                    予約注文
-                </label>
+              
                 
                 <!-- チェックボックスの状態を反映する隠しフィールド -->
                 <input type="hidden" name="reservation" id="is_reservation" value="0">
                 <input type="submit" id="submit_bt" class="grid-item grid-4">
                 
             </form>
+            <div id="reservationModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+
+                <div style="background:white; width:300px; margin:100px auto; padding:20px; border-radius:10px;">
+
+                    <h3>予約注文入力</h3>
+
+                    <form action="/submit" method="POST">
+                        <input type="hidden" name="reservation" id="reservation" value="1">
+
+                        <label>予約時刻</label><br>
+                        <input type="datetime-local" name="time" required><br><br>
+
+                        <label>本数</label><br>
+                        <input type="number" name="number" min="1" required><br><br>
+
+                        <button type="submit">送信</button>
+                        <button type="button" onclick="closeReservationModal()">キャンセル</button>
+                    </form>
+
+                </div>
+            </div>
+            
+
             
             <div class="grid-5" id="grid-5">
                 <div class="addTime">
@@ -237,15 +258,18 @@ let wait_minutes = new Date(now.getTime() + tv * 1000);
 let timeInput = document.getElementById('time');
 let isUserEditingTime = false;
 
-// ユーザーが入力欄を操作し始めたらフラグON
-timeInput.addEventListener('focus', function () {
-    isUserEditingTime = true;
-});
 
-// 操作が終わったらフラグOFF
-timeInput.addEventListener('blur', function () {
-    isUserEditingTime = false;
-});
+
+
+function openReservationModal() {
+  document.getElementById("reservationModal").style.display = "block";
+}
+
+function closeReservationModal() {
+  document.getElementById("reservationModal").style.display = "none";
+}
+
+
 
 function speak(text) {
     // 連続送信対策
@@ -260,7 +284,7 @@ function speak(text) {
 }
 
 document.getElementById('form').addEventListener('submit', function () {
-    const isReservation = document.getElementById('is_reservation').value === "1";
+    const isReservation = document.getElementById('reservation').value === "1";
     const addSeconds = document.getElementById('number').value / 10 * 60;
     const orderNumber = document.getElementById('number').value;
 
@@ -307,6 +331,8 @@ function audio2() {
             if (!isUserEditingTime) inputWaitTime();
         }
 
+        
+
         if (message.type === 'gap') {
             if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
@@ -318,11 +344,7 @@ function audio2() {
         };
 
         
-            document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
-                document.getElementById("is_reservation").value = this.checked ? "1" : "0";
-                inputWaitTime();
-                }
-            )
+            
     
 
     socket.onclose = function() {
@@ -389,6 +411,7 @@ function audio2() {
       checked: <%= data[i].checked %>, 
       reservation: <%= data[i].reservation %>, 
       absorbed: <%= data[i].absorbed ?? 0 %>,
+      done: <%= data[i].done %>,
       time: new Date('<%= data[i].time %>')
     };
 
@@ -428,22 +451,25 @@ function audio2() {
       );
 
       if (confirmed) {
+        
         // ❗ この注文だけスキップ（次へ）
-        console.log(456)
         let amount = addTime<%- i %>.number * 60;
         if (addTime<%- i %>.absorbed == 1) {
             amount = 0;
         }
-    
+        
         
         socket.send(JSON.stringify({ action: 'increase', amount }));
+        
         window.location = "/checked?id=" + addTime<%- i %>.id;
         
         return;
         
       } else {
-        window.location = "/checked?id=" + addTime<%- i %>.id;
-        console.log(123)
+        
+        
+        console.log('cancel')
+        window.location = "/timeline/del?id=" + addTime<%- i %>.id;
         return;
       }
     }
@@ -525,10 +551,7 @@ function audio2() {
         
     }
 
-    document.getElementById("is_reservation_checkbox").addEventListener("change", function () {
-        document.getElementById("is_reservation").value = this.checked ? "1" : "0";
-            });
-
+   
     
     setInterval(function() {
         window.location.reload()

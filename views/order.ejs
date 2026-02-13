@@ -64,7 +64,7 @@
               <%= new Date(new Date(data[i].time).getTime() - (data[i].number / 10 * 60 * 1000)).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit'}) %>
               </td>
               <% } %>
-             <td colspan="2"><% if(data[i].reservation == 1) { %>
+             <td colspan="2"><%= data[i].checked %><% if(data[i].reservation == 1) { %>
                               予約
                             <% } %>
                             <% if(data[i].merged_from) { %>
