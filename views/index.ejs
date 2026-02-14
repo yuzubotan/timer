@@ -181,14 +181,14 @@
 
                     <h3>予約注文入力</h3>
 
-                    <form action="/submit" method="POST">
+                    <form action="/submit" method="POST" id="form2">
                         <input type="hidden" name="reservation" id="reservation" value="1">
 
                         <label>予約時刻</label><br>
                         <input type="datetime-local" name="time" required><br><br>
 
                         <label>本数</label><br>
-                        <input type="number" name="number" min="1" required><br><br>
+                        <input type="number" name="number" min="1" id="number2" required><br><br>
 
                         <button type="submit">送信</button>
                         <button type="button" onclick="closeReservationModal()">キャンセル</button>
@@ -284,16 +284,24 @@ function speak(text) {
 }
 
 document.getElementById('form').addEventListener('submit', function () {
-    const isReservation = document.getElementById('reservation').value === "1";
+    
     const addSeconds = document.getElementById('number').value / 10 * 60;
     const orderNumber = document.getElementById('number').value;
-
-    if (isReservation) {
-        speak('予約注文を受け付けました');
-    } else {
-        const minutes = Math.floor(( timerValue + addSeconds ) / 60);
+    const minutes = Math.floor(( timerValue + addSeconds ) / 60);
         speak(`${orderNumber}本の注文を受け付けました。待ち時間は約${minutes}分です`);
-    }
+        
+    
+});
+
+document.getElementById('form2').addEventListener('submit', function () {
+    
+    const addSeconds = document.getElementById('number2').value / 10 * 60;
+    const orderNumber = document.getElementById('number2').value;
+    const minutes = Math.floor(( timerValue + addSeconds ) / 60);
+    
+        speak(`予約注文を受け付けました。${orderNumber}本です`);
+        
+    
 });
 
 
