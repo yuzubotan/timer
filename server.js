@@ -980,7 +980,9 @@ function toDatetimeLocalString(utcString) {
                       const after = Math.max(0, Math.floor(trueTimerValue / 1000));
                       diff = after - before;
                     } else {
-                      diff = Math.floor((new Date().getTime() - new Date(finishedOrder.time).getTime()) / 1000);
+                    
+      
+                      diff = - finishedOrder.number / 10 * 60;
                     }
                       if (diff !== 0) {
                         const message = JSON.stringify({
