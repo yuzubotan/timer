@@ -747,7 +747,7 @@ app.get('/timeline/del', (req, res) => {
                     if(gapMs != 0) {
                       const message1 = JSON.stringify({
                         type: 'gap',
-                        amount: - gapMs / 1000
+                        amount: Math.floor(- gapMs / 1000)
                       });
                       console.log(message1)
                       wss.clients.forEach(client => {
@@ -842,7 +842,7 @@ function toDatetimeLocalString(utcString) {
 
         
           console.log('finishedOrder.Time:',finishedOrder.time)
-      db.all("select * from form_data where time >= ? and done = 0 order by time asc",
+      db.all("select * from form_data where time >= ? and done = 0 order by id asc",
         [finishedEndTime.toISOString()],
         (err, subsequentOrders) => {
           if (err) {
@@ -973,11 +973,15 @@ function toDatetimeLocalString(utcString) {
                       console.log('lastFinishedEndTime:',toDatetimeLocalString(lastFinishedEndTime))
                     const trueTimerValue = lastFinishedEndTime.getTime() - new Date().getTime();
                     console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
+                    
+                    let diff = 0;
                     if(!prevRow) {
                       const before = timerValue;
                       const after = Math.max(0, Math.floor(trueTimerValue / 1000));
-                      const diff = after - before;
-
+                      diff = after - before;
+                    } else {
+                      diff = Math.floor((new Date().getTime() - new Date(finishedOrder.time).getTime()) / 1000);
+                    }
                       if (diff !== 0) {
                         const message = JSON.stringify({
                           type: 'modify',
@@ -1001,7 +1005,7 @@ function toDatetimeLocalString(utcString) {
                       timerValue = 0;
                     }
                     }
-                  }
+                  
                     }
                   })  
             })
