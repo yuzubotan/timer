@@ -975,15 +975,11 @@ function toDatetimeLocalString(utcString) {
                     console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
                     
                     let diff = 0;
-                    if(!prevRow) {
+                    
                       const before = timerValue;
                       const after = Math.max(0, Math.floor(trueTimerValue / 1000));
                       diff = after - before;
-                    } else {
                     
-      
-                      diff = - finishedOrder.number / 10 * 60;
-                    }
                       if (diff !== 0) {
                         const message = JSON.stringify({
                           type: 'modify',
