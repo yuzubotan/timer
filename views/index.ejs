@@ -167,7 +167,7 @@
                 <input type="datetime-local" id="time" name="time"  class="grid-item grid-2">
                 <button type="button" onclick="openReservationModal()">予約注文</button><br>
                 <label for="number" class="label-2">本数</label><br>
-                <input type="text" id="number" name="number" min="1" max="500" class="grid-item grid-3">
+                <input type="text" id="number" name="number" class="grid-item grid-3">
               
                 
                 <!-- チェックボックスの状態を反映する隠しフィールド -->
@@ -188,7 +188,7 @@
                         <input type="datetime-local" name="time" required><br><br>
 
                         <label>本数</label><br>
-                        <input type="number" name="number" min="1" max="500" id="number2" required><br><br>
+                        <input type="number" name="number" id="number2" required><br><br>
 
                         <button type="submit">送信</button>
                         <button type="button" onclick="closeReservationModal()">キャンセル</button>
@@ -255,11 +255,17 @@ let now = new Date();
 let tv = parseInt(timerValue, 10);
 let wait_minutes = new Date(now.getTime() + tv * 1000);
 
-let timeInput = document.getElementById('time');
+let timeInput = document.getElementById('number');
 let isUserEditingTime = false;
 
-
-
+let submit_bt = document.getElementById('submit_bt');
+submit_bt.addEventListener('click', () => {
+    if(timeInput.value.length > 3) {
+        alert('3桁までしか入力できません');
+        timeInput.value = '';
+        event.preventDefault();
+    }
+})
 
 function openReservationModal() {
   document.getElementById("reservationModal").style.display = "block";
