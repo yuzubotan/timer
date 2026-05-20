@@ -842,8 +842,8 @@ function toDatetimeLocalString(utcString) {
 
         
           console.log('finishedOrder.Time:',finishedOrder.time)
-      db.all("select * from form_data where time >= ? and done = 0 order by id asc",
-        [finishedEndTime.toISOString()],
+      db.all("select * from form_data where done = 0 order by time asc",
+        
         (err, subsequentOrders) => {
           if (err) {
             console.error('注文取得エラー:', err.message);
@@ -896,7 +896,7 @@ function toDatetimeLocalString(utcString) {
                       console.log('prevrow&&res1:', deletedOrderedMs)
                     } else {
                       // 非予約は time = 完了時刻
-                      baseTime = new Date(prevRow.time);
+                      baseTime = new Date();
                       deletedOrderedMs = finishedOrder.number / 10 * 60 * 1000;
                        
                       console.log('prevRowはあるres0:',baseTime)
@@ -945,21 +945,33 @@ function toDatetimeLocalString(utcString) {
 
 
         // 6. DBに保存
-              for (const item of results) {
-                db.run("UPDATE form_data SET time = ? WHERE id = ?", [
-                  item.saveTime.toISOString(),
-                  item.id
-                ]);
-              }
-
-               db.get("SELECT * FROM form_data where checked = 1 and done = 0 order by time desc limit 1",
-                  (err, lastOrder) => {
-                    if(err) {
-                      console.error(err);
-                      return;
+              const updatePromises = results.map(item => {
+                return new Promise((resolve, reject) => {
+                  db.run(
+                    "UPDATE form_data SET time = ? WHERE id = ?",
+                    [item.saveTime.toISOString(), item.id],
+                    err => {
+                      if(err) {
+                        reject(err);
+                      } else {
+                        resolve();
+                      }
                     }
+                  )
+                })
+              });
 
-                    if (!lastOrder) {
+              Promise.all(updatePromises)
+                .then(() => {
+                  db.get(
+                    "SELECT * FROM form_data where checked = 1 and done = 0 order by time desc limit 1",
+                    (err, lastOrder) => {
+                      if(err) {
+                        console.error(err);
+                        return;
+                      }
+                      console.log('lastOrder', lastOrder);
+                      if (!lastOrder) {
                       console.log('未完了注文が存在しない');
 
                       timerValue = 0;
@@ -1005,14 +1017,25 @@ function toDatetimeLocalString(utcString) {
                     }
                   
                     }
-                  })  
+                    }
+                  );
+                })
+                .catch(err => {
+                  console.error('更新失敗:', err);
+                });
+              
+
+
+                    
+                  
             })
         console.log('-------------------------------------------')
-          res.json({ success: true });
+          
 
           })
         }
       )
+      res.json({ success: true });
     })
     })
 
