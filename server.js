@@ -27,9 +27,13 @@ let timerValue = 60; // 初期値（例）
 setInterval(() => {
     if (timerValue > 0) {
         timerValue--;
-        broadcastTimer(); // すべてのクライアントに送信
+        
     }
 }, 1000);
+
+setInterval(() => {
+  broadcastTimer();
+},250);
 
 wss.on('connection', (ws) => {
   console.log('クライアントが接続しました');
