@@ -27,13 +27,9 @@ let timerValue = 60; // 初期値（例）
 setInterval(() => {
     if (timerValue > 0) {
         timerValue--;
-        
+        broadcastTimer(); // すべてのクライアントに送信
     }
 }, 1000);
-
-setInterval(() => {
-  broadcastTimer();
-},250);
 
 wss.on('connection', (ws) => {
   console.log('クライアントが接続しました');
@@ -245,13 +241,14 @@ function updateTimes(order, reservations, context) {
   /** -------------------------
    * 予約注文
    * ------------------------- */
+  let reservation = order.reservation;
   if (order.reservation === 1) {
     const resTime = new Date(order.time);
     const endTime = new Date(resTime.getTime() - 5 * 60000);
     const startTime = new Date(endTime.getTime() - prepDurationMs);
 
     
-    return { startTime, endTime, saveTime: resTime, gapMs: 0 };
+    return { startTime, endTime, saveTime: resTime, gapMs: 0, reservation: reservation};
   }
 
   /** -------------------------
@@ -259,7 +256,6 @@ function updateTimes(order, reservations, context) {
    * ------------------------- */
 
   let startTime;
-  
 
   if (lastEndTime) {
     startTime = new Date(lastEndTime);
@@ -334,6 +330,7 @@ function updateTimes(order, reservations, context) {
     endTime,
     saveTime: endTime,
     gapMs: gapMs,
+    reservation: reservation,
   };
 }
 
@@ -620,7 +617,8 @@ app.get("/order", (req,res) => {
       id: order.id,
       startTime: info.startTime,
       endTime: info.endTime,
-      saveTime: info.saveTime
+      saveTime: info.saveTime,
+      reservation: info.reservation
     });
     }
 
@@ -967,28 +965,22 @@ function toDatetimeLocalString(utcString) {
 
               Promise.all(updatePromises)
                 .then(() => {
-                  db.get(
-                    "SELECT * FROM form_data where checked = 1 and done = 0 order by time desc limit 1",
-                    (err, lastOrder) => {
-                      if(err) {
-                        console.error(err);
-                        return;
-                      }
-                      console.log('lastOrder', lastOrder);
-                      if (!lastOrder) {
-                      console.log('未完了注文が存在しない');
+                  let maxEndTime = null;
 
-                      timerValue = 0;
-                    } else {
-                    console.log('lastOrder', lastOrder)
-                    const lastFinishedTimeRaw = new Date(lastOrder.time);
-                    const lastFinishedEndTime =
-                      lastOrder.reservation == 1
-                        ? new Date(lastFinishedTimeRaw.getTime() - 5 * 60 * 1000)
-                        : lastFinishedTimeRaw;
-                      console.log('lastFinishedEndTime:',toDatetimeLocalString(lastFinishedEndTime))
-                    const trueTimerValue = lastFinishedEndTime.getTime() - new Date().getTime();
+                for (const item of results) {
+
+                  const endTime =
+                    item.reservation == 1
+                    ? new Date(item.saveTime).getTime() - 5 * 60 * 1000
+                    : new Date(item.saveTime).getTime();
+                  console.log('endTime','id:',item.id,':',new Date(endTime),item)
+                  if (maxEndTime === null || endTime > maxEndTime) {
+                    maxEndTime = endTime;
+                    }
+                  }
+                   const trueTimerValue = new Date(maxEndTime).getTime() - new Date().getTime();
                     console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
+                    console.log('maxEndTime',new Date(maxEndTime));
                     
                     let diff = 0;
                     
@@ -1008,21 +1000,15 @@ function toDatetimeLocalString(utcString) {
                           }
                         });
 
-                        
-
+                  
+                    
                       
-                      console.log('timerValue:',timerValue)
-                      console.log('id:',id)
-                      console.log('lastOrder.id:',lastOrder.id);
-                      if(id == lastOrder.id) {
-                        console.log(123)
-                      timerValue = 0;
-                    }
+                      
+                    
+                  
+                    
                     }
                   
-                    }
-                    }
-                  );
                 })
                 .catch(err => {
                   console.error('更新失敗:', err);

@@ -251,6 +251,7 @@
 <script>
 
 let timerValue = 0;
+
 let now = new Date();
 let tv = parseInt(timerValue, 10);
 let wait_minutes = new Date(now.getTime() + tv * 1000);
@@ -263,7 +264,7 @@ submit_bt.addEventListener('click', () => {
     if(timeInput.value.length > 3) {
         alert('3桁までしか入力できません');
         timeInput.value = '';
-        event.preventDefault();
+        event.preventDefault()
     }
 })
 
