@@ -908,7 +908,7 @@ function toDatetimeLocalString(utcString) {
                     deletedOrderedMs = new Date(finishedEndTime).getTime() - new Date().getTime();
                     baseTime = new Date(); // 先頭を消した場合
                     gapMs = 0;
-                    
+                  }      
                   
             const reservations = subsequentOrders.filter(o => o.reservation === 1);
 
