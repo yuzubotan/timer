@@ -40,9 +40,14 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message);
       if (data.action === 'increase') {
+        console.log('====================');
         console.log('increase:', data.amount);
+        console.log('before timerValue:', timerValue);
       
         timerValue += data.amount;
+        console.log('after timerValue:', timerValue);
+        console.log('time:', new Date().toISOString());
+        console.log('====================');
         broadcastTimer();
       } else if (data.action === 'reset') {
         timerValue = 0;
@@ -229,13 +234,7 @@ function updateTimes(order, reservations, context) {
     gapPeriods = [],
     deletedRow = new Date()
   } = context;
-  console.log('baseTime:',baseTime)
-  console.log('deletedOrderedMs:',deletedOrderedMs)
-  console.log('timerValue:', timerValue)
-  console.log('resStartList:',resStartList)
-  console.log('gapPeriods:',gapPeriods)
-  console.log('deletedRow:',deletedRow)
-  console.log('---------order.id:', order.id)
+
   const prepDurationMs = (order.number / 10) * 60000;
 
   /** -------------------------
@@ -264,8 +263,7 @@ function updateTimes(order, reservations, context) {
   }
 
   let endTime = new Date(startTime.getTime() + prepDurationMs);
-  console.log('update:startTime', startTime)
-  console.log('update:endTime:',endTime)
+
   /** -------------------------
    * 予約との重複回避（核心）
    * ------------------------- */
@@ -323,8 +321,7 @@ function updateTimes(order, reservations, context) {
   
     lastEndTime = endTime;
   
-  console.log('lastEndTime:', toDatetimeLocalString(lastEndTime))
-  console.log('lastEndTime:', lastEndTime)
+  
   return {
     startTime,
     endTime,
@@ -341,6 +338,12 @@ function calculateGapTime(gapMs, newGapMs, wss) {
   
       console.log('gapMs:',gapMs/1000/60)
       console.log('previousGapMs:', previousGapMs/1000/60)
+      console.log(
+        '[gap send]',
+        'gapMs=', gapMs,
+        'newGapMs=', newGapMs,
+        'previousGapMs=', previousGapMs
+      );
       if (gapMs > previousGapMs && wss) {
         console.log('gapMs:',gapMs/1000/60)
         const message = JSON.stringify({ type: 'gap', amount: Math.floor(newGapMs / 1000)});
@@ -676,15 +679,13 @@ app.get('/timeline/del', (req, res) => {
                     
                   })
                   rows.sort((a, b) => a.startTime - b.startTime);
-                  console.log('map:rows:',rows)
+                  
 
               let targetTime = deletedRow.time;
-              console.log('target1:',targetTime)
-              console.log(typeof targetTime)
+              
               if(deletedRow.reservation == 1) {
                 targetTime = new Date(new Date(deletedRow.time).getTime() - 5 * 60 * 1000).toISOString();
-                console.log('target2:',targetTime);
-                console.log(typeof targetTime);
+                
               }
               
               db.get("SELECT * FROM form_data WHERE time < ? ORDER BY time DESC LIMIT 1",
@@ -695,24 +696,24 @@ app.get('/timeline/del', (req, res) => {
                   let baseTime;
 
                   if (prevRow) {
-                    console.log('prevRowはある')
+                    
                     if (prevRow.reservation === 1) {
                       // 予約は time が「予約時刻」なので endTime を計算
                       const resTime = new Date(prevRow.time);
                       const end = new Date(resTime.getTime() - 5 * 60000);
                       const prepMs = (prevRow.number / 10) * 60000;
                       baseTime = new Date(end.getTime()); // ← 完成時刻
-                      console.log('prevRowはあるres1:',baseTime)
+                      
                     } else {
                       // 非予約は time = 完了時刻
                       baseTime = new Date(prevRow.time);
-                       console.log('prevRowはあるres0:',baseTime)
+                       
                     }
                   } else {
-                    console.log('prevRowはない')
+                    
                     baseTime = new Date(); // 先頭を消した場合
                   }
-                  console.log('baseTime結果:', baseTime)
+                  
                   const reservations = rows.filter(o => o.reservation === 1);
            
                   const context = {
@@ -726,7 +727,7 @@ app.get('/timeline/del', (req, res) => {
                     gapMs: gapMs,
                     newGapMs: newGapMs
                   };
-                  console.log('timeline/del:context:',context)
+                  
                   const wss = req.app.locals.wss;
 
                   const totalReduceMs =
@@ -739,7 +740,7 @@ app.get('/timeline/del', (req, res) => {
                       amount: Math.floor(-totalReduceMs / 1000)
                       
                     });
-                    console.log('amount:', message)
+                    
                     wss.clients.forEach(client => {
                       if (client.readyState === WebSocket.OPEN) {
                         client.send(message);
@@ -751,7 +752,7 @@ app.get('/timeline/del', (req, res) => {
                         type: 'gap',
                         amount: Math.floor(- gapMs / 1000)
                       });
-                      console.log(message1)
+                      
                       wss.clients.forEach(client => {
                         if(client.readyState === WebSocket.OPEN) {
                           client.send(message1);
@@ -759,16 +760,16 @@ app.get('/timeline/del', (req, res) => {
                       });
                     }
 
-                    console.log('timerValue total reduce:', -totalReduceMs / 1000);
+                    
                     gapMs = 0;
                   }
 
                   
                   
-                  console.log('context.deletedOrderedMs:', context.deletedOrderedMs)
+                  
             // 5. まとめて再計算！
                   const results = recalcAfterDelete(rows, reservations, context);
-                  console.log('results:', results)
+                  
             // 6. DBに保存
                   for (const item of results) {
                     if (!(item.saveTime instanceof Date)) {
@@ -814,21 +815,21 @@ function toDatetimeLocalString(utcString) {
   app.get("/timeline/modify", (req, res) => {
     lastEndTime = null;
     let id = req.query.id;
-    console.log('id:',id)
+  
     let sql = "select * from form_data where id = ?";
     db.get(sql, [id], (err, finishedOrder) => {
       if(err) {
         console.error('修正データの取得に失敗しました', err)
       }
         
-      console.log('finishedOrder:',finishedOrder)
+      
 
       const finishedTimeRaw = new Date(finishedOrder.time);
       const finishedEndTime =
         finishedOrder.reservation == 1
           ? new Date(finishedTimeRaw.getTime() - 5 * 60 * 1000)
           : finishedTimeRaw;
-      console.log('finishedEndTime:',finishedEndTime)
+      
 
       db.run(
         "UPDATE form_data SET done = 1 WHERE id = ?",
@@ -839,11 +840,11 @@ function toDatetimeLocalString(utcString) {
             return res.sendStatus(500);
           }
 
-          console.log('finishedOrder:',finishedOrder)
+          
 
 
         
-          console.log('finishedOrder.Time:',finishedOrder.time)
+        
       db.all("select * from form_data where done = 0 order by time asc",
         
         (err, subsequentOrders) => {
@@ -873,7 +874,7 @@ function toDatetimeLocalString(utcString) {
               
               db.get("SELECT * FROM form_data WHERE time < ? and done = 0 ORDER BY time DESC LIMIT 1",
                 [finishedEndTime.toISOString()],(err, prevRow) => {
-                  console.log('prevRow:',prevRow)
+                
                 // prevRow が null の場合もある
 
                 
@@ -885,7 +886,7 @@ function toDatetimeLocalString(utcString) {
                   calculateGapTime(gapMs, newGapMs, wss);
 
                   if (prevRow) {
-                    console.log('prevRowはある')
+                    
                     if (prevRow.reservation === 1) {
                       // 予約は time が「予約時刻」なので endTime を計算
                       const resTime = new Date(prevRow.time);
@@ -894,25 +895,20 @@ function toDatetimeLocalString(utcString) {
                       baseTime = new Date(end.getTime()); // ← 完成時刻
                       deletedOrderedMs = finishedOrder.number / 10 * 60 * 1000;
                       
-                      console.log('prevRowはあるres1:',baseTime)
-                      console.log('prevrow&&res1:', deletedOrderedMs)
+                      
                     } else {
                       // 非予約は time = 完了時刻
                       baseTime = new Date();
                       deletedOrderedMs = finishedOrder.number / 10 * 60 * 1000;
                        
-                      console.log('prevRowはあるres0:',baseTime)
-                      console.log('prevrow&&res0:', deletedOrderedMs)
+                      
                     }
                   } else {
-                    console.log('prevRowはない')
+                    
                     deletedOrderedMs = new Date(finishedEndTime).getTime() - new Date().getTime();
                     baseTime = new Date(); // 先頭を消した場合
                     gapMs = 0;
-                    console.log('prevrowなし:', deletedOrderedMs)
-                    console.log('prevrowはない内gapMs:',gapMs)
-                  }
-                  console.log('baseTime結果:', baseTime)
+                    
                   
             const reservations = subsequentOrders.filter(o => o.reservation === 1);
 
@@ -937,7 +933,7 @@ function toDatetimeLocalString(utcString) {
                     
                   
                   
-                  console.log('subsequentOrders:',subsequentOrders);
+                
                   
               
         // 5. まとめて再計算！
@@ -973,14 +969,13 @@ function toDatetimeLocalString(utcString) {
                     item.reservation == 1
                     ? new Date(item.saveTime).getTime() - 5 * 60 * 1000
                     : new Date(item.saveTime).getTime();
-                  console.log('endTime','id:',item.id,':',new Date(endTime),item)
+                  
                   if (maxEndTime === null || endTime > maxEndTime) {
                     maxEndTime = endTime;
                     }
                   }
                    const trueTimerValue = new Date(maxEndTime).getTime() - new Date().getTime();
-                    console.log('trueTimerValue:', trueTimerValue / 1000 / 60);
-                    console.log('maxEndTime',new Date(maxEndTime));
+                    
                     
                     let diff = 0;
                     
@@ -993,7 +988,7 @@ function toDatetimeLocalString(utcString) {
                           type: 'modify',
                           amount: diff
                         });
-                        console.log('diff:', diff)
+                        
                         wss.clients.forEach(client => {
                           if (client.readyState === WebSocket.OPEN) {
                             client.send(message);
