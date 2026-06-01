@@ -43,7 +43,8 @@ wss.on('connection', (ws) => {
         console.log('====================');
         console.log('increase:', data.amount);
         console.log('before timerValue:', timerValue);
-      
+        console.log(new Error().stack);
+        
         timerValue += data.amount;
         console.log('after timerValue:', timerValue);
         console.log('time:', new Date().toISOString());
@@ -987,11 +988,13 @@ function toDatetimeLocalString(utcString) {
                         const message = JSON.stringify({
                           type: 'modify',
                           amount: diff
+                          
                         });
                         
                         wss.clients.forEach(client => {
                           if (client.readyState === WebSocket.OPEN) {
                             client.send(message);
+                            console.log('[SEND increase]', message.amount);
                           }
                         });
 

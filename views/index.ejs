@@ -349,11 +349,22 @@ function audio2() {
         
 
         if (message.type === 'gap') {
+            alert(
+                '[GAP RECEIVED]\n' +
+                'amount=' + message.amount +
+                '\ncurrent timerValue=' + timerValue
+                );
+
             if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 action: 'increase',
                 amount: message.amount
             }));
+
+            alert(
+                '[GAP FORWARD]\n' +
+                'amount=' + message.amount
+                );
             }
         }
         };
