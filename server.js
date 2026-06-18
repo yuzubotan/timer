@@ -44,7 +44,7 @@ wss.on('connection', (ws) => {
         console.log('increase:', data.amount);
         console.log('before timerValue:', timerValue);
         console.log(new Error().stack);
-        
+
         timerValue += data.amount;
         console.log('after timerValue:', timerValue);
         console.log('time:', new Date().toISOString());
@@ -940,7 +940,38 @@ function toDatetimeLocalString(utcString) {
         // 5. まとめて再計算！
               const results = recalcAfterDelete(subsequentOrders, reservations, context);
               
-             
+             console.log('===== MODIFY START =====');
+
+console.log(
+  'finishedOrder',
+  finishedOrder.id,
+  finishedOrder.time,
+  finishedOrder.number
+);
+
+console.log(
+  'deletedOrderedMs(min)',
+  deletedOrderedMs / 1000 / 60
+);
+
+console.log(
+  'baseTime',
+  baseTime
+);
+
+console.log(
+  'timerValue(before)',
+  timerValue
+);
+
+results.forEach(r => {
+  console.log(
+    'result',
+    r.id,
+    r.saveTime,
+    r.reservation
+  );
+});
 
 
         // 6. DBに保存
@@ -977,7 +1008,15 @@ function toDatetimeLocalString(utcString) {
                   }
                    const trueTimerValue = new Date(maxEndTime).getTime() - new Date().getTime();
                     
-                    
+                  console.log(
+  'maxEndTime',
+  new Date(maxEndTime)
+);
+
+console.log(
+  'trueTimerValue(sec)',
+  Math.floor(trueTimerValue / 1000)
+);  
                     let diff = 0;
                     
                       const before = timerValue;
