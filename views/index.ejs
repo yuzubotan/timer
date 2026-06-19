@@ -462,8 +462,7 @@ function audio2() {
     if (
       wait_minutes > timeToStart<%- i %> &&
       addTime<%- i %>.checked === 0 &&
-      addTime<%- i %>.reservation === 1 &&
-      addTime<%- i %>.done == 0
+      addTime<%- i %>.reservation === 1 
     ) {
       const confirmed = await confirmWithTimeout(
         `予約を追加しますか？ ${addTime<%- i %>.time.getHours()}時${addTime<%- i %>.time.getMinutes()}分に${addTime<%- i %>.number * 10} 本です`,
