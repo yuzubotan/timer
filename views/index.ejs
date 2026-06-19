@@ -349,11 +349,7 @@ function audio2() {
         
 
         if (message.type === 'gap') {
-            alert(
-                '[GAP RECEIVED]\n' +
-                'amount=' + message.amount +
-                '\ncurrent timerValue=' + timerValue
-                );
+            
 
             if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
@@ -361,10 +357,7 @@ function audio2() {
                 amount: message.amount
             }));
 
-            alert(
-                '[GAP FORWARD]\n' +
-                'amount=' + message.amount
-                );
+            
             }
         }
         };
