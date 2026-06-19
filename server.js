@@ -242,13 +242,14 @@ function updateTimes(order, reservations, context) {
    * 予約注文
    * ------------------------- */
   let reservation = order.reservation;
+  let checked = order.checked;
   if (order.reservation === 1) {
     const resTime = new Date(order.time);
     const endTime = new Date(resTime.getTime() - 5 * 60000);
     const startTime = new Date(endTime.getTime() - prepDurationMs);
 
     
-    return { startTime, endTime, saveTime: resTime, gapMs: 0, reservation: reservation};
+    return { startTime, endTime, saveTime: resTime, gapMs: 0, reservation: reservation, checked: checked};
   }
 
   /** -------------------------
@@ -329,6 +330,8 @@ function updateTimes(order, reservations, context) {
     saveTime: endTime,
     gapMs: gapMs,
     reservation: reservation,
+    checked: checked
+  
   };
 }
 
@@ -622,7 +625,8 @@ app.get("/order", (req,res) => {
       startTime: info.startTime,
       endTime: info.endTime,
       saveTime: info.saveTime,
-      reservation: info.reservation
+      reservation: info.reservation,
+      checked: info.checked
     });
     }
 
@@ -939,7 +943,7 @@ function toDatetimeLocalString(utcString) {
               
         // 5. まとめて再計算！
               const results = recalcAfterDelete(subsequentOrders, reservations, context);
-              
+              console.log("results:",results);
              console.log('===== MODIFY START =====');
 
 console.log(
@@ -996,6 +1000,9 @@ results.forEach(r => {
                   let maxEndTime = null;
 
                 for (const item of results) {
+                  if (item.reservation === 1 && item.checked === 0) {
+                    continue;
+                  }
 
                   const endTime =
                     item.reservation == 1
