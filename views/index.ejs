@@ -290,12 +290,36 @@ function speak(text) {
     speechSynthesis.speak(utter);
 }
 
-document.getElementById('form').addEventListener('submit', function () {
-    
-    const addSeconds = document.getElementById('number').value / 10 * 60;
-    const orderNumber = document.getElementById('number').value;
-    const minutes = Math.floor(( timerValue + addSeconds ) / 60);
-        speak(`${orderNumber}本の注文を受け付けました。待ち時間は約${minutes}分です`);
+document.getElementById('form').addEventListener('submit', function (event) {
+    const orderNumber = document.getElementById('number').value.trim();
+
+    // 未入力チェック
+    if (orderNumber === '') {
+        event.preventDefault();
+
+        alert('入力欄が未入力です');
+        speak('入力欄が未入力です');
+
+        return;
+    }
+
+    event.preventDefault();
+
+    const form = this;
+    const addSeconds = orderNumber / 10 * 60;
+    const minutes = Math.floor((timerValue + addSeconds) / 60);
+
+    const utter = new SpeechSynthesisUtterance(
+        `${orderNumber}本の注文を受け付けました。待ち時間は約${minutes}分です`
+    );
+
+    utter.lang = 'ja-JP';
+
+    utter.onend = () => {
+        form.submit();
+    };
+
+    speechSynthesis.speak(utter);
         
     
 });
