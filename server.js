@@ -43,7 +43,7 @@ wss.on('connection', (ws) => {
         console.log('====================');
         console.log('increase:', data.amount);
         console.log('before timerValue:', timerValue);
-        console.log(new Error().stack);
+        //console.log(new Error().stack);
 
         timerValue += data.amount;
         console.log('after timerValue:', timerValue);
@@ -102,55 +102,125 @@ app.get('/next-id', (req, res) => {
     });
 });
 
-app.get('/timeline', (req, res) => {
-  const sql = "SELECT * FROM form_data WHERE done = 0 ORDER BY time ASC";
-  db.all(sql, [], (err, rows) => {
-    
-      if (err) {
-          console.log('Database query error:', err.message);
-          return res.status(500).send('Database query error');
-      }
 
-      const data = rows.map(row => {
+app.get('/timeline', (req, res) => {
+  const sql = `
+    SELECT *
+    FROM form_data
+    WHERE done = 0
+    ORDER BY time ASC
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.log('Database query error:', err.message);
+      return res.status(500).send('Database query error');
+    }
+
+    // 個別注文の情報を取得
+    db.all(
+      `SELECT id, master_id, number, completed
+       FROM merged_order_items
+       ORDER BY id ASC`,
+      [],
+      (err, members) => {
+        if (err) {
+          console.error('マージ注文取得エラー:', err.message);
+          return res.status(500).send('Merged order query error');
+        }
+
+        // 代表注文IDごとに個別注文をまとめる
+        const membersByMaster = {};
+
+        console.log('個別注文テーブル:', members);
+        console.log(
+          '表示中の予約:',
+          rows.map(row => ({
+            id: row.id,
+            merged_from: row.merged_from,
+            absorbed: row.absorbed
+          }))
+        );
+
+        for (const member of members) {
+          if (!membersByMaster[member.master_id]) {
+            membersByMaster[member.master_id] = [];
+          }
+
+          membersByMaster[member.master_id].push(member);
+        }
+
+        const data = rows.map(row => {
           let reserveTime = null;
           let completionTime = null;
           let startTime = null;
 
-          const prepDurationMs = (row.number / 10) * 60000; // 調理時間
+          const prepDurationMs = (row.number / 10) * 60000;
 
           if (row.reservation === 1) {
-              // 予約注文
-              reserveTime = new Date(Date.parse(row.time)); // DBに保存された予約時刻
-              completionTime = new Date(reserveTime.getTime() - 5 * 60000); // 完了時刻は5分前
-              startTime = new Date(completionTime.getTime() - prepDurationMs); // 開始時刻
+            reserveTime = new Date(row.time);
+
+            completionTime = new Date(
+              reserveTime.getTime() - 5 * 60000
+            );
+
+            startTime = new Date(
+              completionTime.getTime() - prepDurationMs
+            );
           } else {
-              // 非予約注文
-              completionTime = new Date(Date.parse(row.time)); // DBに保存された完了時刻
-              startTime = new Date(completionTime.getTime() - prepDurationMs); // 開始時刻
+            completionTime = new Date(row.time);
+
+            startTime = new Date(
+              completionTime.getTime() - prepDurationMs
+            );
           }
 
-
           return {
-              id: row.id,
-              number: row.number,
-              reservation: row.reservation,
-              merged_from: row.merged_from,
-              reserveTime: reserveTime ? reserveTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}) : null,
-              completionTime: completionTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}),
-              startTime: startTime.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'}),
-              hour: startTime.getHours(),
-              minutes: startTime.getMinutes()
+            id: row.id,
+            number: row.number,
+            checked: row.checked,
+            reservation: row.reservation,
+            merged_from: row.merged_from,
+
+            // この代表注文に属する個別注文
+            mergedItems: membersByMaster[row.id] || [],
+
+            reserveTime: reserveTime
+              ? reserveTime.toLocaleTimeString('ja-JP', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : null,
+
+            completionTime: completionTime.toLocaleTimeString('ja-JP', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+
+            startTime: startTime.toLocaleTimeString('ja-JP', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+
+            hour: startTime.getHours(),
+            minutes: startTime.getMinutes()
           };
-      });
+        });
 
-      // 開始時刻で並び替え
-      data.sort((a, b) => {
-          return (a.hour * 60 + a.minutes) - (b.hour * 60 + b.minutes);
-      });
+        data.sort((a, b) => {
+          return (a.hour * 60 + a.minutes) -
+                 (b.hour * 60 + b.minutes);
+        });
 
-      res.render('timeline.ejs', { title: 'timeline', data });
+        res.render('timeline.ejs', {
+          title: 'timeline',
+          data
+        });
+      }
+    );
   });
 });
+
 
 
     
@@ -335,7 +405,316 @@ function updateTimes(order, reservations, context) {
   };
 }
 
-    
+
+app.post('/timeline/toggle-checked', (req, res) => {
+    const id = Number(req.query.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({
+            error: '不正な注文IDです'
+        });
+    }
+
+    // ① 対象の予約注文を取得
+    db.get(
+        'SELECT * FROM form_data WHERE id = ? AND reservation = 1',
+        [id],
+        (err, row) => {
+            if (err) {
+                console.error('予約取得エラー:', err);
+                return res.status(500).json({
+                    error: 'データ取得に失敗しました'
+                });
+            }
+
+            if (!row) {
+                return res.status(404).json({
+                    error: '予約注文が見つかりません'
+                });
+            }
+
+            // ② checkedを切り替える
+            const newChecked = Number(row.checked) === 1 ? 0 : 1;
+
+            db.run(
+                'UPDATE form_data SET checked = ? WHERE id = ?',
+                [newChecked, id],
+                (err) => {
+                    if (err) {
+                        console.error('checked更新エラー:', err);
+                        return res.status(500).json({
+                            error: 'データ更新に失敗しました'
+                        });
+                    }
+
+                    // ③ 予約の準備開始時刻を計算
+                    const prepDurationMs =
+                        (Number(row.number) / 10) * 60 * 1000;
+
+                    const reservationEnd =
+                        new Date(row.time).getTime() - 5 * 60 * 1000;
+
+                    const targetTime =
+                        new Date(reservationEnd - prepDurationMs);
+
+                    const targetTimeStr = targetTime.toISOString();
+
+                    // 再計算用のグローバル変数を初期化
+                    lastEndTime = null;
+                    gapMs = 0;
+                    previousGapMs = 0;
+                    gapPeriods = [];
+                    resStartList = [];
+                    newGapMs = 0;
+
+                    // ④ 対象予約以降の未完了注文を取得
+                    db.all(
+                        `SELECT * FROM form_data
+                         WHERE done = 0 AND time >= ?
+                         ORDER BY time ASC`,
+                        [targetTimeStr],
+                        (err, orders) => {
+                            if (err) {
+                                console.error('後続注文取得エラー:', err);
+                                return res.status(500).json({
+                                    error: '注文取得に失敗しました'
+                                });
+                            }
+
+                            // 注文の準備開始時刻を計算して並べ替える
+                            orders.forEach(order => {
+                                const duration =
+                                    (Number(order.number) / 10) * 60000;
+
+                                let startTime;
+
+                                if (Number(order.reservation) === 1) {
+                                    startTime =
+                                        new Date(order.time).getTime()
+                                        - duration
+                                        - 5 * 60000;
+                                } else {
+                                    startTime =
+                                        new Date(order.time).getTime()
+                                        - duration;
+                                }
+
+                                order.startTime = startTime;
+                            });
+
+                            orders.sort(
+                                (a, b) => a.startTime - b.startTime
+                            );
+
+                            // ⑤ 対象より前にある最後の注文を取得
+                            db.get(
+                                
+                                `SELECT * FROM form_data
+                                 WHERE time < ? AND done = 0
+                                 AND (reservation = 0 OR checked = 1)
+                                 ORDER BY time DESC LIMIT 1`,
+                                [targetTimeStr],
+                                (err, prevRow) => {
+                                    if (err) {
+                                        console.error('前の注文取得エラー:', err);
+                                        return res.status(500).json({
+                                            error: '前の注文取得に失敗しました'
+                                        });
+                                    }
+
+                                    let baseTime;
+
+                                    if (prevRow) {
+                                        if (
+                                            Number(prevRow.reservation) === 1
+                                        ) {
+                                            baseTime = new Date(
+                                                new Date(prevRow.time).getTime()
+                                                - 5 * 60000
+                                            );
+                                        } else {
+                                            baseTime = new Date(prevRow.time);
+                                        }
+                                    } else {
+                                        baseTime = new Date();
+                                    }
+
+                                    // ⑥ チェック済み予約だけを重複判定に使う
+                                    const reservations = orders.filter(
+                                        order =>
+                                            Number(order.reservation) === 1 &&
+                                            Number(order.checked) === 1
+                                    );
+
+                                    const context = {
+                                        baseTime,
+                                        now: new Date(),
+                                        timerValue,
+                                        deletedOrderedMs: 0,
+                                        resStartList,
+                                        gapPeriods,
+                                        gapMs,
+                                        newGapMs
+                                    };
+
+                                    // ⑦ 後続注文を再計算
+                                    const results = recalcAfterDelete(
+                                        orders,
+                                        reservations,
+                                        context
+                                    );
+
+                                    console.log(
+                                        '[toggle-checked] results:',
+                                        results
+                                    );
+
+                                    // ⑧ 再計算した時刻をDBに保存
+                                    const updatePromises = results.map(item => {
+                                        return new Promise((resolve, reject) => {
+                                            db.run(
+                                                `UPDATE form_data
+                                                 SET time = ?
+                                                 WHERE id = ?`,
+                                                [
+                                                    item.saveTime.toISOString(),
+                                                    item.id
+                                                ],
+                                                err => {
+                                                    if (err) {
+                                                        reject(err);
+                                                    } else {
+                                                        resolve();
+                                                    }
+                                                }
+                                            );
+                                        });
+                                    });
+
+                                    Promise.all(updatePromises)
+                                        .then(() => {
+
+                                            // ⑨ DB保存後、未完了注文をすべて取得
+                                            db.all(
+                                                `SELECT * FROM form_data
+                                                 WHERE done = 0`,
+                                                [],
+                                                (err, allOrders) => {
+                                                    if (err) {
+                                                        console.error(
+                                                            'タイマー計算用取得エラー:',
+                                                            err
+                                                        );
+                                                        return res.status(500).json({
+                                                            error: 'タイマー計算に失敗しました'
+                                                        });
+                                                    }
+
+                                                    let maxEndTime = null;
+
+                                                    for (const order of allOrders) {
+
+                                                        // 未確認の予約は除外
+                                                        if (
+                                                            Number(order.reservation) === 1 &&
+                                                            Number(order.checked) === 0
+                                                        ) {
+                                                            continue;
+                                                        }
+
+                                                        const endTime =
+                                                            new Date(order.time).getTime()
+                                                            - (
+                                                                Number(order.reservation) === 1
+                                                                    ? 5 * 60000
+                                                                    : 0
+                                                            );
+
+                                                        if (
+                                                            Number.isFinite(endTime) &&
+                                                            (
+                                                                maxEndTime === null ||
+                                                                endTime > maxEndTime
+                                                            )
+                                                        ) {
+                                                            maxEndTime = endTime;
+                                                        }
+                                                    }
+
+                                                    // ⑩ 最後尾の時刻からタイマーを計算
+                                                    const after =
+                                                        maxEndTime === null
+                                                            ? 0
+                                                            : Math.max(
+                                                                0,
+                                                                Math.floor(
+                                                                    (maxEndTime - Date.now()) / 1000
+                                                                )
+                                                            );
+
+                                                    const diff = after - timerValue;
+
+                                                    console.log(
+                                                        '[toggle-checked] checked:',
+                                                        newChecked
+                                                    );
+                                                    console.log(
+                                                        '[toggle-checked] before:',
+                                                        timerValue
+                                                    );
+                                                    console.log(
+                                                        '[toggle-checked] after:',
+                                                        after
+                                                    );
+                                                    console.log(
+                                                        '[toggle-checked] diff:',
+                                                        diff
+                                                    );
+
+                                                    // ⑪ 全端末にタイマー変更を通知
+                                                    const wss = req.app.locals.wss;
+
+                                                    if (diff !== 0 && wss) {
+                                                        const message = JSON.stringify({
+                                                            type: 'modify',
+                                                            amount: diff
+                                                        });
+
+                                                        wss.clients.forEach(client => {
+                                                            if (
+                                                                client.readyState === WebSocket.OPEN
+                                                            ) {
+                                                                client.send(message);
+                                                            }
+                                                        });
+                                                    }
+
+                                                    res.json({
+                                                        success: true,
+                                                        checked: newChecked
+                                                    });
+                                                }
+                                            );
+                                        })
+                                        .catch(err => {
+                                            console.error(
+                                                '注文時刻のDB更新に失敗:',
+                                                err
+                                            );
+                                            return res.status(500).json({
+                                                error: '注文時刻の更新に失敗しました'
+                                            });
+                                        });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
   
 
 function calculateGapTime(gapMs, newGapMs, wss) {
@@ -424,165 +803,301 @@ function calculateGapTime(gapMs, newGapMs, wss) {
 
   
 
-  app.post('/submit', (req, res) => {
-    
-    deletedOrderedMs = 0;
-    const { time, number, reservation } = req.body;
-    const orderedtime = new Date();
+app.post('/submit', (req, res) => {
+  const { time, number, reservation } = req.body;
 
-    const order = {
-        time: new Date(time),
-        number: Number(number),
-        reservation: Number(reservation)
+  // 本数の入力チェック（1～3桁の数字のみ）
+  const numberText = String(number ?? '').trim();
+
+  if (!/^[0-9]{1,3}$/.test(numberText) || Number(numberText) < 1) {
+    return res.status(400).send(
+      '本数は1～999本の範囲で入力してください。'
+    );
+  }
+
+  // 予約区分のチェック
+  const reservationType = Number(reservation);
+
+  if (reservationType !== 0 && reservationType !== 1) {
+    return res.status(400).send(
+      '注文区分が正しくありません。'
+    );
+  }
+
+  // 予約注文の場合は日時もチェック
+  if (
+    reservationType === 1 &&
+    (!time || isNaN(new Date(time).getTime()))
+  ) {
+    return res.status(400).send(
+      '予約日時が正しくありません。'
+    );
+  }
+  deletedOrderedMs = 0;
+  const orderedtime = new Date();
+
+  const order = {
+    time: new Date(time),
+    number: Number(number),
+    reservation: Number(reservation)
+  };
+
+  // ========================================
+  // 通常注文の処理（従来の処理を維持）
+  // ========================================
+  if (order.reservation === 0) {
+    const sqlSelect = `
+      SELECT time, number
+      FROM form_data
+      WHERE reservation = 1
+      ORDER BY time ASC
+    `;
+
+    db.all(sqlSelect, [], (err, reservations) => {
+      if (err) {
+        console.error('予約データ取得エラー:', err.message);
+        return res.status(500).send(
+          '予約データ取得中にエラーが発生しました。'
+        );
+      }
+
+      const context = {
+        deletedOrderedMs: 0,
+        now: new Date(),
+        timerValue,
+        resStartList: [],
+        gapPeriods: gapPeriods,
+        gapMs: 0
       };
 
+      const { saveTime, gapMs, newGapMs } =
+        calculateTimes(order, reservations, context);
 
-  
-    if(order.reservation == 0) {
-      const sqlSelect = `SELECT time, number FROM form_data WHERE reservation = 1 ORDER BY time ASC`;
-      db.all(sqlSelect, [], (err, reservations) => {
-        if (err) {
-          console.error("予約データ取得エラー:", err.message);
-          return res.status(500).send("予約データ取得中にエラーが発生しました。");
-        }
-      
-        const context = {
-          deletedOrderedMs: 0,      // 削除再計算ではないため常に 0
-          now: new Date(),
-          timerValue,
-          resStartList: [],
-          gapPeriods: gapPeriods,
-          gapMs: 0
-        };
-        const { saveTime, gapMs, newGapMs } = calculateTimes(order, reservations, context);
-      console.log('newGap:', newGapMs)
-        const wss = req.app.locals.wss;
-        calculateGapTime(gapMs, newGapMs, wss);
-      
-      
-        const sqlInsert = `
-          INSERT INTO form_data (time, orderedtime, number, reservation)
-          VALUES (?, ?, ?, ?)
-        `;
-      
-        const values = [
-          saveTime.toISOString(),     // 予約なら予約時刻、非予約なら完了時刻
+      console.log('newGap:', newGapMs);
+
+      const wss = req.app.locals.wss;
+      calculateGapTime(gapMs, newGapMs, wss);
+
+      const sqlInsert = `
+        INSERT INTO form_data
+          (time, orderedtime, number, reservation)
+        VALUES (?, ?, ?, ?)
+      `;
+
+      db.run(
+        sqlInsert,
+        [
+          saveTime.toISOString(),
           orderedtime.toISOString(),
           order.number,
           order.reservation
-        ];
-        db.run(sqlInsert, values, (err) => {
+        ],
+        (err) => {
           if (err) {
-            console.error("データ保存エラー:", err.message);
-            return res.status(500).send("データ保存中にエラーが発生しました。");
+            console.error('データ保存エラー:', err.message);
+            return res.status(500).send(
+              'データ保存中にエラーが発生しました。'
+            );
           }
-          res.redirect("/");
-        });
-      });
-      return;
-    }
-  
-    db.all(
-      `SELECT * FROM form_data WHERE reservation = 1 AND done = 0 AND absorbed = 0 ORDER BY time ASC`,
-      [],(err, rows) => {
+
+          res.redirect('/');
+        }
+      );
+    });
+
+    return;
+  }
+
+  // ========================================
+  // 予約注文の処理
+  // ========================================
+  db.all(
+    `SELECT *
+     FROM form_data
+     WHERE reservation = 1
+       AND done = 0
+       AND absorbed = 0
+     ORDER BY time ASC`,
+    [],
+    (err, rows) => {
       if (err) {
         console.error(err);
         return res.sendStatus(500);
       }
 
-    // ★① まず新規予約を INSERT（必ず）
-    db.run(
-      `INSERT INTO form_data (time, orderedtime, number, reservation)
-       VALUES (?, ?, ?, 1)`,
-      [
-        order.time.toISOString(),
-        orderedtime.toISOString(),
-        order.number
-      ],
-      function (err) {
-        if (err) {
-          console.error(err);
-          return res.sendStatus(500);
-        }
+      // 新しい予約を1回だけ登録
+      db.run(
+        `INSERT INTO form_data
+           (time, orderedtime, number, reservation)
+         VALUES (?, ?, ?, 1)`,
+        [
+          order.time.toISOString(),
+          orderedtime.toISOString(),
+          order.number
+        ],
+        function (err) {
+          if (err) {
+            console.error(err);
+            return res.sendStatus(500);
+          }
 
-        const newId = this.lastID;
+          const newId = this.lastID;
 
-        // ★② 新規予約を rows に追加
-        const newRow = {
-          id: newId,
-          time: order.time,
-          number: order.number,
-          merged_from: null
-        };
+          // 既存予約と重なるかを判定
+          const { merged, absorbedIds } =
+            mergeReservationChain(order, rows);
 
-        const rowsWithNew = [...rows, newRow];
+          // 重ならない場合は単独予約のまま終了
+          if (absorbedIds.length === 0) {
+            return res.redirect('/');
+          }
 
-        // ★③ マージ判定
-        const { merged, absorbedIds } = mergeReservationChain(order, rows);
+          // 重なる場合だけ、新しいIDを追加
+          absorbedIds.push(newId);
 
-        // ★ 新規予約IDを吸収対象に追加
-        absorbedIds.push(newId);
+          const involvedRows = rows.filter(
+            row => absorbedIds.includes(row.id)
+          );
 
-        if (absorbedIds.length > 0) {
-
-          const keepRow = rows
-            .filter(r => absorbedIds.includes(r.id))
-            .concat({ id: newId, time: order.time }) // newRowも考慮
-            .sort((a, b) => new Date(a.time) - new Date(b.time))[0];
+          // 代表となる注文を決定
+          const keepRow = involvedRows
+            .concat({
+              id: newId,
+              time: order.time,
+              number: order.number,
+              merged_from: null
+            })
+            .sort(
+              (a, b) =>
+                new Date(a.time) - new Date(b.time)
+            )[0];
 
           const keepId = keepRow.id;
 
-          const prevMergedIds = keepRow.merged_from
-            ? keepRow.merged_from.split(',').map(Number)
-            : [];
+          // マージに含まれる元の注文IDを集める
+          const mergedIds = new Set([newId]);
 
-          const mergedIds = Array.from(
-            new Set([keepId, ...prevMergedIds, ...absorbedIds])
-          );
+          for (const row of involvedRows) {
+            if (row.merged_from) {
+              row.merged_from
+                .split(',')
+                .map(Number)
+                .filter(Number.isInteger)
+                .forEach(id => mergedIds.add(id));
+            } else {
+              mergedIds.add(row.id);
+            }
+          }
 
-          const mergedFromStr = mergedIds.join(',');
+          // 代表IDも必ず含める
+          mergedIds.add(keepId);
 
+          const allIds = [...mergedIds];
+          const mergedFromStr = allIds.join(',');
+
+          // 代表以外は吸収済みにする
           const absorbedOnlyIds =
-            absorbedIds.filter(id => id !== keepId);
+            allIds.filter(id => id !== keepId);
 
           db.serialize(() => {
+            // 以前からある単独予約の元情報を保存
+            for (const row of involvedRows) {
+              if (!row.merged_from) {
+                db.run(
+                  `INSERT INTO merged_order_items
+                     (id, master_id, number, completed)
+                   VALUES (?, ?, ?, 0)
+                   ON CONFLICT(id) DO UPDATE SET
+                    master_id = excluded.master_id,
+                    number = excluded.number`,
+                  [row.id, keepId, row.number]
+                );
+              } else {
+                // 既存のマージグループを新しい代表IDにまとめる
+                const oldIds = row.merged_from
+                  .split(',')
+                  .map(Number)
+                  .filter(Number.isInteger);
 
+                if (oldIds.length > 0) {
+                  db.run(
+                    `UPDATE merged_order_items
+                     SET master_id = ?
+                     WHERE id IN (${oldIds.map(() => '?').join(',')})`,
+                    [keepId, ...oldIds]
+                  );
+                }
+              }
+            }
+
+            // 今回追加した予約の元情報を保存
             db.run(
-              `UPDATE form_data SET number = ?, time = ?, merged_from = ?, absorbed = 0 WHERE id = ?`,
+              `INSERT INTO merged_order_items
+                 (id, master_id, number, completed)
+               VALUES (?, ?, ?, 0)
+               ON CONFLICT(id) DO UPDATE SET
+                master_id = excluded.master_id,
+                number = excluded.number`,
+              [newId, keepId, order.number]
+            );
+
+            // 代表予約の本数・時間・元ID一覧を更新
+            db.run(
+              `UPDATE form_data
+               SET number = ?,
+                   time = ?,
+                   merged_from = ?,
+                   absorbed = 0,
+                   done = 0
+               WHERE id = ?`,
               [
                 merged.number,
                 merged.time.toISOString(),
                 mergedFromStr,
                 keepId
-              ]
+              ],
+              (err) => {
+                if (err) {
+                  console.error('代表予約更新エラー:', err.message);
+                  return res.status(500).send(
+                    '予約情報の更新に失敗しました。'
+                  );
+                }
+
+                // 代表以外の予約を吸収済みにする
+                if (absorbedOnlyIds.length === 0) {
+                  return res.redirect('/');
+                }
+
+                db.run(
+                  `UPDATE form_data
+                   SET absorbed = 1, done = 1
+                   WHERE id IN (${absorbedOnlyIds.map(() => '?').join(',')})`,
+                  absorbedOnlyIds,
+                  (err) => {
+                    if (err) {
+                      console.error(
+                        '吸収済み予約の更新エラー:',
+                        err.message
+                      );
+                      return res.status(500).send(
+                        '予約情報の更新に失敗しました。'
+                      );
+                    }
+
+                    res.redirect('/');
+                  }
+                );
+              }
             );
-
-            if (absorbedOnlyIds.length > 0) {
-              db.run(
-                `UPDATE form_data SET absorbed = 1, done = 1 WHERE id IN (${absorbedOnlyIds.map(() => '?').join(',')})`,
-                absorbedOnlyIds
-              );
-            }
           });
-
-          return res.redirect('/');
         }
+      );
+    }
+  );
+});
 
-
-        // 吸収がなければ INSERT 済みなのでそのまま
-        return res.redirect('/');
-      }
-    );
-  }
-);
   
-  });
-  
-
-
-
-
-
 
 
 
@@ -632,6 +1147,7 @@ app.get("/order", (req,res) => {
 
     return results;
 }
+
 
 
   // 削除処理
@@ -816,6 +1332,67 @@ function toDatetimeLocalString(utcString) {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
+
+  
+app.post('/timeline/complete-merged-item', (req, res) => {
+  const masterId = Number(req.body.masterId);
+  const memberId = Number(req.body.memberId);
+
+  if (
+    !Number.isInteger(masterId) || masterId <= 0 ||
+    !Number.isInteger(memberId) || memberId <= 0
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: '注文IDが正しくありません。'
+    });
+  }
+
+  // 指定された個別注文だけ完了にする
+  db.run(
+    `UPDATE merged_order_items
+     SET completed = 1
+     WHERE id = ? AND master_id = ?`,
+    [memberId, masterId],
+    function (err) {
+      if (err) {
+        console.error('個別注文更新エラー:', err.message);
+        return res.sendStatus(500);
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({
+          success: false,
+          message: '個別注文が見つかりません。'
+        });
+      }
+
+      // このマージグループの完了状況を調べる
+      db.all(
+        `SELECT completed
+         FROM merged_order_items
+         WHERE master_id = ?`,
+        [masterId],
+        (err, items) => {
+          if (err) {
+            console.error('完了状況取得エラー:', err.message);
+            return res.sendStatus(500);
+          }
+
+          const allComplete =
+            items.length > 0 &&
+            items.every(item => Number(item.completed) === 1);
+
+          res.json({
+            success: true,
+            allComplete
+          });
+        }
+      );
+    }
+  );
+});
+
 
   app.get("/timeline/modify", (req, res) => {
     lastEndTime = null;
@@ -1076,33 +1653,53 @@ console.log(
 
      
 
-  // サーバーサイドのエンドポイント
-  app.post("/reset", (req, res) => {
-    previousGapMs = 0;
-    gapPeriods = [];
-    resStartList = [];
-    newGapMs = 0;
-    gapMs = 0;
-    let sql = "DELETE FROM form_data";
-    db.run(sql, (err) => {
-      if (err) {
-        console.error('データベースのリセットに失敗しました。', err);
-        res.status(500).send('Internal Server Error');
-      } else {
-        // IDシーケンスをリセット
-        db.run("DELETE FROM sqlite_sequence WHERE name='form_data'", (seqErr) => {
-            if (seqErr) {
-                console.error('IDシーケンスのリセットに失敗しました。', seqErr);
-                res.status(500).send('Internal Server Error');
-            } else {
-              
-        console.log('データベースをリセットしました。');
-        res.status(200).send('OK');
-      }})}
-        
+    // サーバーサイドのエンドポイント
+    
       
+app.post("/reset", (req, res) => {
+  previousGapMs = 0;
+  gapPeriods = [];
+  resStartList = [];
+  newGapMs = 0;
+  gapMs = 0;
+
+  db.serialize(() => {
+    // 1. 注文データを削除
+    db.run("DELETE FROM form_data", (err) => {
+      if (err) {
+        console.error("form_dataのリセットに失敗しました。", err);
+        return res.status(500).send("Internal Server Error");
+      }
+
+      // 2. 個別注文データを削除
+      db.run("DELETE FROM merged_order_items", (err) => {
+        if (err) {
+          console.error(
+            "merged_order_itemsのリセットに失敗しました。",
+            err
+          );
+          return res.status(500).send("Internal Server Error");
+        }
+
+        // 3. form_dataのIDシーケンスをリセット
+        db.run(
+          "DELETE FROM sqlite_sequence WHERE name='form_data'",
+          (err) => {
+            if (err) {
+              console.error("IDシーケンスのリセットに失敗しました。", err);
+              return res.status(500).send("Internal Server Error");
+            }
+
+            console.log("データベースをリセットしました。");
+            return res.status(200).send("OK");
+          }
+        );
+      });
     });
   });
+});
+
+  
   
   app.get('/checked', (req, res) => {
     let id = req.query.id;

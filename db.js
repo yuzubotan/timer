@@ -54,6 +54,16 @@ db.serialize(() => {
       db.run(`ALTER TABLE form_data ADD COLUMN absorbed INTEGER DEFAULT 0`);
     }
   });
+
+  // マージされた予約の元注文を個別に管理するテーブル
+  db.run(`
+    CREATE TABLE IF NOT EXISTS merged_order_items (
+      id INTEGER PRIMARY KEY,
+      master_id INTEGER NOT NULL,
+      number NUMERIC NOT NULL,
+      completed INTEGER DEFAULT 0
+    )
+  `);
 });
 
 module.exports = db;

@@ -290,39 +290,65 @@ function speak(text) {
     speechSynthesis.speak(utter);
 }
 
-document.getElementById('form').addEventListener('submit', function (event) {
-    const orderNumber = document.getElementById('number').value.trim();
+let isSubmitting = false;
 
-    // 未入力チェック
-    if (orderNumber === '') {
-        event.preventDefault();
+document.getElementById('form').addEventListener('submit', function (e) {
 
-        alert('入力欄が未入力です');
-        speak('入力欄が未入力です');
+    const numberInput = document.getElementById('number');
+    const orderNumber = numberInput.value.trim();
 
+    // 本数の入力チェック
+    if (!/^[0-9]{1,3}$/.test(orderNumber) || Number(orderNumber) < 1) {
+        e.preventDefault();
+        alert('本数は1～999本で入力してください');
         return;
     }
 
-    event.preventDefault();
+    // すでに送信中なら再送信しない
+    if (isSubmitting) {
+        e.preventDefault();
+        return;
+    }
 
-    const form = this;
-    const addSeconds = orderNumber / 10 * 60;
+    // 音声案内が終わるまで通常の送信を止める
+    e.preventDefault();
+
+    // 送信中にする
+    isSubmitting = true;
+
+    // キーボードからの追加入力を禁止
+    numberInput.readOnly = true;
+
+    // 送信ボタンを無効化
+    document.getElementById('submit_bt').disabled = true;
+
+    // 待ち時間の計算
+    const addSeconds = Number(orderNumber) / 10 * 60;
     const minutes = Math.floor((timerValue + addSeconds) / 60);
 
+    // 音声案内
     const utter = new SpeechSynthesisUtterance(
         `${orderNumber}本の注文を受け付けました。待ち時間は約${minutes}分です`
     );
 
     utter.lang = 'ja-JP';
 
+    const form = this;
+
+    // 音声案内が終了したら送信
     utter.onend = () => {
         form.submit();
     };
 
+    // 音声再生に失敗した場合も送信
+    utter.onerror = () => {
+        form.submit();
+    };
+
     speechSynthesis.speak(utter);
-        
-    
+
 });
+
 
 document.getElementById('form2').addEventListener('submit', function () {
     
@@ -398,7 +424,19 @@ function audio2() {
     
   
     function addNumber(num) {
-        number.value += num;
+
+        // 送信中は入力させない
+        if (isSubmitting) {
+            return;
+        }
+
+        // すでに入力されていたらエラー
+        if (number.value !== '') {
+            alert('本数は1回だけ入力してください');
+            return;
+        }
+
+        number.value = num;
         audio();
     }
 
